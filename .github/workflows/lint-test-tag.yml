@@ -1,0 +1,49 @@
+name: Python lint/test/tag
+
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: pip install flake8 mypy
+    - name: Check code style with Flake8
+      uses: TrueBrain/actions-flake8@v1.2
+      with:
+        path: src tests
+    - name: Check types with Mypy
+      uses: jpetrucciani/mypy-check@0.761
+      with:
+        path: src
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: pip install -e .[test]
+    - name: Test with pytest
+      run: pytest
+
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: jaliborc/action-general-autotag@1.0.0
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        source_file: docs/versionhistory.rst
+        extraction_regex: "\\*\\*(\\d+\\.\\d+\\.\\d+(?:(?:a|b|rc)\\d+)?)\\*\\*"
