@@ -3,20 +3,19 @@ name: Python codeqa/test/tag
 on: [push]
 
 jobs:
-  codeqa:
+  flake8:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python
-      uses: actions/setup-python@v1
-      with:
-        python-version: 3.8
-    - name: Install dependencies
-      run: pip install flake8 mypy
     - name: Check code style with Flake8
       uses: TrueBrain/actions-flake8@v1.2
       with:
         path: src tests
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
     - name: Check types with Mypy
       uses: jpetrucciani/mypy-check@0.761
       with:
@@ -24,7 +23,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: codeqa
+    needs: [flake8, mypy]
     strategy:
       matrix:
         python-version: [3.6, 3.7, 3.8]
@@ -35,9 +34,28 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: pip install .[test]
+      run: |
+        pip install https://github.com/bboe/coveralls-python/archive/bb0e00166b28f49db04d6a8b8cb4bddb5afa529f.zip
+        pip install .[test]
     - name: Test with pytest
-      run: pytest
+      run: coverage run -m pytest
+    - name: Upload coverage data to Coveralls
+      run: |
+        env
+        coveralls
+      env:
+        COVERALLS_PARALLEL: true
+        COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  coveralls:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Tell Coveralls that the parallel build is finished
+      uses: coverallsapp/github-action@v1.0.1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
 
   tag:
     runs-on: ubuntu-latest

@@ -1,6 +1,7 @@
-.. image:: https://dev.azure.com/alexgronholm/smtpproto/_apis/build/status/agronholm.smtpproto?branchName=master
+.. image:: https://github.com/agronholm/smtpproto/workflows/Python%20codeqa%2Ftest%2Ftag/badge.svg?branch=master
   :alt: Build Status
-.. image:: https://img.shields.io/azure-devops/coverage/agronholm/smtpproto/1/master.svg
+.. image:: https://coveralls.io/repos/github/agronholm/smtpproto/badge.svg?branch=master
+  :target: https://coveralls.io/github/agronholm/smtpproto?branch=master
   :alt: Code Coverage
 .. image:: https://readthedocs.org/projects/smtpproto/badge/?version=latest
   :target: https://smtpproto.readthedocs.io/en/latest/?badge=latest
