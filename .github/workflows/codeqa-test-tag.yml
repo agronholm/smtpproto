@@ -16,10 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Check types with Mypy
-      uses: jpetrucciani/mypy-check@0.761
+    - name: Set up Python
+      uses: actions/setup-python@v1
       with:
-        path: src
+        python-version: 3.x
+    - name: Install dependencies
+      run: pip install mypy
+    - name: Check types with Mypy
+      run: mypy src
 
   test:
     needs: [flake8, mypy]
