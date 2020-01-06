@@ -19,7 +19,7 @@ The following SMTP extensions are supported:
 
 .. _sans-io: https://sans-io.readthedocs.io/
 .. _ESMTP: https://tools.ietf.org/html/rfc5321
-.. _AnyIO: https://pypi.org/agronholm/anyio
+.. _AnyIO: https://pypi.org/project/anyio/
 .. _8BITMIME: https://tools.ietf.org/html/rfc1652
 .. _AUTH: https://tools.ietf.org/html/rfc4954
 .. _SMTPUTF8: https://tools.ietf.org/html/rfc6531
