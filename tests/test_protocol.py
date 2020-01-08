@@ -5,8 +5,7 @@ from typing import Optional, Callable
 import pytest
 
 from smtpproto.protocol import (
-    SMTPClientProtocol, ClientState, SMTPProtocolViolation,
-    SMTPErrorResponse, SMTPMissingExtension)
+    SMTPClientProtocol, ClientState, SMTPProtocolViolation, SMTPMissingExtension)
 
 
 def call_protocol_method(protocol: SMTPClientProtocol, func: Callable,
@@ -141,7 +140,7 @@ def test_reset_mail_tx(protocol):
 
 
 def test_bad_greeting(protocol):
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, b'554 Go away\r\n').match('554 Go away')
+    feed_bytes(protocol, b'554 Go away\r\n', 554, 'Go away')
 
 
 def test_premature_greeting(protocol):
@@ -159,8 +158,7 @@ def test_authentication_required(protocol):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar.com'),
                          b'MAIL FROM:<foo@bar.com> BODY=8BITMIME\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, b'530 Authentication required\r\n').\
-        match('530 Authentication required')
+    feed_bytes(protocol, b'530 Authentication required\r\n', 530, 'Authentication required')
 
 
 def test_noop(protocol):
@@ -217,8 +215,7 @@ def test_ehlo_error(protocol, error_code):
     feed_bytes(protocol, b'220 foo.bar SMTP service ready\r\n', 220, 'foo.bar SMTP service ready',
                ClientState.greeting_received)
     call_protocol_method(protocol, lambda: protocol.send_greeting('foo.bar'), b'EHLO foo.bar\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
 @pytest.mark.parametrize('error_code', [502, 504, 550])
@@ -228,8 +225,7 @@ def test_helo_error(protocol, error_code):
     call_protocol_method(protocol, lambda: protocol.send_greeting('foo.bar'), b'EHLO foo.bar\r\n')
     feed_bytes(protocol, b'500 unrecognized command\r\n')
     assert protocol.get_outgoing_data() == b'HELO foo.bar\r\n'
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
 @pytest.mark.parametrize('error_code', [451, 452, 455, 503, 550, 553, 552, 555])
@@ -237,8 +233,7 @@ def test_mail_error(protocol, error_code):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar'),
                          b'MAIL FROM:<foo@bar> BODY=8BITMIME\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
 @pytest.mark.parametrize('error_code', [450, 451, 452, 455, 503, 550, 551, 552, 553, 555])
@@ -248,8 +243,7 @@ def test_rcpt_error(protocol, error_code):
                          b'MAIL FROM:<foo@bar> BODY=8BITMIME\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
     call_protocol_method(protocol, lambda: protocol.recipient('foo@bar'), b'RCPT TO:<foo@bar>\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
 @pytest.mark.parametrize('error_code', [450, 451, 452, 503, 550, 552, 554])
@@ -261,8 +255,7 @@ def test_start_data_error(protocol, error_code):
     call_protocol_method(protocol, lambda: protocol.recipient('foo@bar'), b'RCPT TO:<foo@bar>\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
     call_protocol_method(protocol, protocol.start_data, b'DATA\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
 @pytest.mark.parametrize('error_code', [432, 454, 500, 534, 535, 538])
@@ -270,5 +263,4 @@ def test_auth_error(protocol, error_code):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.authenticate('PLAIN', 'dummy'),
                          b'AUTH PLAIN dummy\r\n')
-    pytest.raises(SMTPErrorResponse, feed_bytes, protocol, f'{error_code} Error\r\n'.encode()).\
-        match(f'{error_code} Error')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')

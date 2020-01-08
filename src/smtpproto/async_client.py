@@ -11,7 +11,7 @@ from anyio import connect_tcp
 from anyio.abc import SocketStream
 
 from .async_auth import SMTPCredentialsProvider
-from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPError
+from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPException
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +70,17 @@ class AsyncSMTPClient:
     async def _wait_response(self) -> SMTPResponse:
         while True:
             if not self._stream:
-                raise SMTPError('Not connected')
+                raise SMTPException('Not connected')
 
             if self._protocol.needs_incoming_data:
                 data = await self._stream.receive_some(65536)
                 logger.debug('Received: %s', data)
                 response = self._protocol.feed_bytes(data)
                 if response:
-                    return response
+                    if response.is_error():
+                        response.raise_as_exception()
+                    else:
+                        return response
 
             data = self._protocol.get_outgoing_data()
             if data:
@@ -86,7 +89,7 @@ class AsyncSMTPClient:
 
     async def _send_command(self, command: Callable, *args) -> SMTPResponse:
         if not self._stream:
-            raise SMTPError('Not connected')
+            raise SMTPException('Not connected')
 
         command(*args)
         data = self._protocol.get_outgoing_data()

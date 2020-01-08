@@ -13,7 +13,7 @@ from aiosmtpd.smtp import SMTP, syntax
 
 from smtpproto.async_auth import PlainCredentialsProvider
 from smtpproto.async_client import AsyncSMTPClient
-from smtpproto.protocol import SMTPError
+from smtpproto.protocol import SMTPException
 
 
 class DummyController(Controller):
@@ -106,7 +106,7 @@ async def test_auth_plain(caplog, client_context, server_context, success):
     credentials_provider = PlainCredentialsProvider('username', 'password')
     with start_server(ssl_context=server_context, factory=AuthCapableSMTP,
                       handler=AuthCapableHandler) as (host, port):
-        with ExitStack() if success else pytest.raises(SMTPError):
+        with ExitStack() if success else pytest.raises(SMTPException):
             async with AsyncSMTPClient(host=host, port=port, ssl_context=client_context,
                                        credentials_provider=credentials_provider):
                 pass

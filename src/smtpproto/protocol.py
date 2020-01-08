@@ -3,7 +3,7 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTPUTF8, SMTP, Policy
 from enum import Enum, auto
-from typing import Iterable, Optional, List, Union, Tuple, FrozenSet, Sequence
+from typing import Iterable, Optional, List, Union, Tuple, FrozenSet, Sequence, NoReturn
 
 import attr
 
@@ -23,33 +23,31 @@ class ClientState(Enum):
     finished = auto()
 
 
+class SMTPException(Exception):
+    """Base class for SMTP exceptions."""
+
+
+class SMTPMissingExtension(SMTPException):
+    """Raised when a required SMTP extension is not present on the server."""
+
+
+class SMTPProtocolViolation(SMTPException):
+    """Raised when there has been a violation of the (E)SMTP protocol by either side."""
+
+
 @attr.s(auto_attribs=True, slots=True, frozen=True)
 class SMTPResponse:
     """Represents a response from the server."""
     code: int  #: response status code (between 100 and 599)
     message: str  #: response message
 
+    def is_error(self) -> bool:
+        """Return ``True`` if this is an error response, ``False`` if not."""
+        return self.code >= 400
 
-class SMTPError(Exception):
-    """Base class for SMTP errors."""
-
-
-class SMTPMissingExtension(SMTPError):
-    """Raised when a required SMTP extension is not present on the server."""
-
-
-class SMTPProtocolViolation(SMTPError):
-    """Signals that there has been a violation of the (E)SMTP protocol by either side."""
-
-
-class SMTPErrorResponse(SMTPError):
-    def __init__(self, code: int, message: str):
-        super().__init__(code, message)
-        self.code = code
-        self.message = message
-
-    def __str__(self):
-        return f'{self.code} {self.message}'
+    def raise_as_exception(self) -> NoReturn:
+        """Raise an :class:`SMTPException` from this response."""
+        raise SMTPException(f'{self.code} {self.message}')
 
 
 @attr.s(auto_attribs=True)
@@ -115,7 +113,7 @@ class SMTPClientProtocol:
         if code == 530 and 'AUTH' in self._extensions:
             # As per RFC 4954, authentication cannot be required for some commands
             if command not in ('AUTH', 'EHLO', 'HELO', 'NOOP', 'RSET', 'QUIT'):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
 
         if command is None:
             if self._state is ClientState.data_sent:
@@ -128,7 +126,7 @@ class SMTPClientProtocol:
                     return SMTPResponse(code, '\n'.join(lines))
                 elif code == 554:
                     self._state = ClientState.finished
-                    raise SMTPErrorResponse(code, '\n'.join(lines))
+                    return SMTPResponse(code, '\n'.join(lines))
         elif command == 'EHLO':
             if code == 250:
                 self._state = ClientState.ready
@@ -138,13 +136,13 @@ class SMTPClientProtocol:
                 self._send_command('HELO', *args)
                 return None
             elif code in (504, 550):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
         elif command == 'HELO':
             if code == 250:
                 self._state = ClientState.ready
                 return SMTPResponse(code, '\n'.join(lines))
             elif code in (502, 504, 550):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
         elif command == 'NOOP':
             if code == 250:
                 return SMTPResponse(code, '\n'.join(lines))
@@ -157,19 +155,19 @@ class SMTPClientProtocol:
                 self._state = ClientState.mailtx
                 return SMTPResponse(code, '\n'.join(lines))
             elif code in (451, 452, 455, 503, 550, 553, 552, 555):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
         elif command == 'RCPT':
             if code in (250, 251):
                 self._state = ClientState.recipient_sent
                 return SMTPResponse(code, '\n'.join(lines))
             elif code in (450, 451, 452, 455, 503, 550, 551, 552, 553, 555):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
         elif command == 'DATA':
             if code == 354:
                 self._state = ClientState.send_data
                 return SMTPResponse(code, '\n'.join(lines))
             elif code in (450, 451, 452, 503, 550, 552, 554):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
         elif command == 'RSET':
             if code == 250:
                 self._state = ClientState.ready
@@ -183,7 +181,7 @@ class SMTPClientProtocol:
                 self._state = ClientState.authenticated
                 return SMTPResponse(code, '\n'.join(lines))
             elif code in (432, 454, 500, 534, 535, 538):
-                raise SMTPErrorResponse(code, '\n'.join(lines))
+                return SMTPResponse(code, '\n'.join(lines))
 
         self._state = ClientState.finished
         raise SMTPProtocolViolation(f'Unexpected response: {code} ' + '\n'.join(lines))
@@ -321,8 +319,12 @@ class SMTPClientProtocol:
         """
         Feed received bytes from the transport into the state machine.
 
+        if this method raises :exc:`SMTPProtocolViolation`, the state machine is transitioned to
+        the ``finished`` state, and the connection should be closed.
+
         :param data: received bytes
-        :return: a response object
+        :return: a response object if a complete response was received, ``None`` otherwise
+        :raises SMTPProtocolViolation: if the server sent an invalid response
 
         """
         self._in_buffer += data
