@@ -215,7 +215,7 @@ class SMTPClientProtocol:
 
     @property
     def extensions(self) -> FrozenSet[str]:
-        """Return ``True`` if the server has declared that it has the given extension."""
+        """The set of extensions advertised by the server."""
         return self._extensions
 
     def authenticate(self, mechanism: str, secret: str) -> None:
