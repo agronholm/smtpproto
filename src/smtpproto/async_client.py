@@ -10,7 +10,7 @@ import attr
 from anyio import connect_tcp
 from anyio.abc import SocketStream
 
-from .async_auth import SMTPCredentialsProvider
+from .auth import SMTPCredentialsProvider
 from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPException
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class AsyncSMTPClient:
 
                 # Authenticate if credentials provided
                 if self.credentials_provider:
-                    credentials = await self.credentials_provider.get_credentials()
+                    credentials = self.credentials_provider.get_credentials()
                     await self._send_command(self._protocol.authenticate,
                                              self.credentials_provider.mechanism, credentials)
             except BaseException:

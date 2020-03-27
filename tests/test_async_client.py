@@ -11,7 +11,7 @@ from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Sink
 from aiosmtpd.smtp import SMTP, syntax
 
-from smtpproto.async_auth import PlainCredentialsProvider
+from smtpproto.auth import PlainCredentialsProvider
 from smtpproto.async_client import AsyncSMTPClient
 from smtpproto.protocol import SMTPException
 
