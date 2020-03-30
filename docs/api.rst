@@ -21,3 +21,10 @@ Async client implementation
 .. automodule:: smtpproto.async_client
     :members:
     :show-inheritance:
+
+Synchronous client implementation
+---------------------------------
+
+.. automodule:: smtpproto.sync_client
+    :members:
+    :show-inheritance:
