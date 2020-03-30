@@ -7,7 +7,7 @@ from ssl import SSLContext
 from typing import Optional, Iterable, Callable, Union, List
 
 import attr
-from anyio import connect_tcp
+from anyio import connect_tcp, fail_after
 from anyio.abc import SocketStream
 
 from .auth import SMTPCredentialsProvider
@@ -18,8 +18,22 @@ logger = logging.getLogger(__name__)
 
 @attr.s(auto_attribs=True, kw_only=True)
 class AsyncSMTPClient:
+    """
+    An example asynchronous SMTP client.
+
+    :param host: host name or IP address of the SMTP server
+    :param port: port on the SMTP server to connect to
+    :param connect_timeout: connection timeout (in seconds)
+    :param read_timeout: timeout for reading responses (in seconds)
+    :param domain: domain name to send to the server as part of the greeting message
+    :param ssl_context: SSL context to use for establishing TLS encrypted sessions
+    :param credentials_provider: credentials to use for authenticating with the SMTP server
+    """
+
     host: str
     port: int = 587
+    connect_timeout: float = 30
+    read_timeout: float = 60
     domain: str = attr.ib(factory=socket.gethostname)
     ssl_context: Optional[SSLContext] = None
     credentials_provider: Optional[SMTPCredentialsProvider] = None
@@ -35,8 +49,11 @@ class AsyncSMTPClient:
 
     async def connect(self) -> None:
         if not self._stream:
-            self._stream = await connect_tcp(self.host, self.port, ssl_context=self.ssl_context,
-                                             tls_standard_compatible=False)
+            async with fail_after(self.connect_timeout):
+                self._stream = await connect_tcp(
+                    self.host, self.port, ssl_context=self.ssl_context,
+                    tls_standard_compatible=False)
+
             try:
                 await self._wait_response()
                 await self._send_command(self._protocol.send_greeting, self.domain)
@@ -94,7 +111,9 @@ class AsyncSMTPClient:
         command(*args)
         data = self._protocol.get_outgoing_data()
         logger.debug('Sent: %s', data)
-        await self._stream.send_all(data)
+        async with fail_after(self.read_timeout):
+            await self._stream.send_all(data)
+
         return await self._wait_response()
 
     async def send_message(self, message: EmailMessage, *,
