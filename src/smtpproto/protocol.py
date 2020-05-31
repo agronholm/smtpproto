@@ -1,11 +1,10 @@
 import re
+from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTPUTF8, SMTP, Policy
 from enum import Enum, auto
 from typing import Iterable, Optional, List, Union, Tuple, FrozenSet, Sequence, NoReturn
-
-import attr
 
 response_re = re.compile('(\\d+)([- ])(.*)$')
 
@@ -35,7 +34,7 @@ class SMTPProtocolViolation(SMTPException):
     """Raised when there has been a violation of the (E)SMTP protocol by either side."""
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@dataclass(frozen=True)
 class SMTPResponse:
     """Represents a response from the server."""
     code: int  #: response status code (between 100 and 599)
@@ -50,20 +49,20 @@ class SMTPResponse:
         raise SMTPException(f'{self.code} {self.message}')
 
 
-@attr.s(auto_attribs=True)
+@dataclass
 class SMTPClientProtocol:
     """The (E)SMTP protocol state machine."""
 
-    _state: ClientState = attr.ib(init=False, default=ClientState.greeting_expected)
-    _out_buffer: bytes = attr.ib(init=False, default=b'')
-    _in_buffer: bytes = attr.ib(init=False, default=b'')
-    _response_code: Optional[int] = attr.ib(init=False, default=None)
-    _response_lines: List[str] = attr.ib(init=False, factory=list)
-    _command_sent: Optional[str] = attr.ib(init=False, default=None)
-    _args_sent: Optional[Tuple[str, ...]] = attr.ib(init=False, default=None)
-    _extensions: FrozenSet[str] = attr.ib(init=False, factory=frozenset)
-    _auth_mechanisms: FrozenSet[str] = attr.ib(init=False, factory=frozenset)
-    _max_message_size: Optional[int] = attr.ib(init=False, default=None)
+    _state: ClientState = field(init=False, default=ClientState.greeting_expected)
+    _out_buffer: bytes = field(init=False, default=b'')
+    _in_buffer: bytes = field(init=False, default=b'')
+    _response_code: Optional[int] = field(init=False, default=None)
+    _response_lines: List[str] = field(init=False, default_factory=list)
+    _command_sent: Optional[str] = field(init=False, default=None)
+    _args_sent: Optional[Tuple[str, ...]] = field(init=False, default=None)
+    _extensions: FrozenSet[str] = field(init=False, default_factory=frozenset)
+    _auth_mechanisms: FrozenSet[str] = field(init=False, default_factory=frozenset)
+    _max_message_size: Optional[int] = field(init=False, default=None)
 
     def _require_state(self, *states: ClientState) -> None:
         if self._state not in states:

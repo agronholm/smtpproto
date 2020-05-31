@@ -1,12 +1,11 @@
 import logging
 import socket
+from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from ssl import SSLContext, SSLSocket, create_default_context
 from typing import Optional, Iterable, Callable, Union, List
-
-import attr
 
 from .auth import SMTPCredentialsProvider
 from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPException
@@ -14,7 +13,7 @@ from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPExcepti
 logger = logging.getLogger(__name__)
 
 
-@attr.s(auto_attribs=True, kw_only=True)
+@dataclass
 class SMTPClient:
     """
     An example blocking SMTP client.
@@ -32,11 +31,11 @@ class SMTPClient:
     port: int = 587
     connect_timeout: float = 30
     read_timeout: float = 60
-    domain: str = attr.ib(factory=socket.gethostname)
-    ssl_context: Optional[SSLContext] = attr.ib(factory=create_default_context)
+    domain: str = field(default_factory=socket.gethostname)
+    ssl_context: Optional[SSLContext] = field(default_factory=create_default_context)
     credentials_provider: Optional[SMTPCredentialsProvider] = None
-    _protocol: SMTPClientProtocol = attr.ib(init=False, factory=SMTPClientProtocol)
-    _socket: Union[socket.socket, SSLSocket, None] = attr.ib(init=False, default=None)
+    _protocol: SMTPClientProtocol = field(init=False, default_factory=SMTPClientProtocol)
+    _socket: Union[socket.socket, SSLSocket, None] = field(init=False, default=None)
 
     def __enter__(self):
         self.connect()
@@ -64,7 +63,7 @@ class SMTPClient:
 
                 # Authenticate if credentials provided
                 if self.credentials_provider:
-                    credentials = self.credentials_provider.get_credentials()
+                    credentials = self.credentials_provider.get_credentials_sync()
                     self._send_command(self._protocol.authenticate,
                                              self.credentials_provider.mechanism, credentials)
             except BaseException:
