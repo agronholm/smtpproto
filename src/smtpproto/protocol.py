@@ -13,6 +13,7 @@ class ClientState(Enum):
     """Enumerates all possible protocol states."""
     greeting_expected = auto()
     greeting_received = auto()
+    authenticating = auto()
     authenticated = auto()
     ready = auto()
     mailtx = auto()
@@ -28,6 +29,10 @@ class SMTPException(Exception):
 
 class SMTPMissingExtension(SMTPException):
     """Raised when a required SMTP extension is not present on the server."""
+
+
+class SMTPUnsupportedAuthMechanism(SMTPException):
+    """Raised when trying to authenticate using a mechanism not supported by the server."""
 
 
 class SMTPProtocolViolation(SMTPException):
@@ -75,6 +80,11 @@ class SMTPClientProtocol:
             raise SMTPMissingExtension(f'This operation requires the {extension} extension but '
                                        f'the server does not support it')
 
+    def _require_auth_mechanism(self, mechanism) -> None:
+        if mechanism not in self._auth_mechanisms:
+            raise SMTPUnsupportedAuthMechanism(
+                f'{mechanism} is not a supported authentication mechanism on this server')
+
     def _send_command(self, command: str, *args: str) -> None:
         if self._command_sent is not None:
             raise SMTPProtocolViolation('Tried to send a command before the previous one received '
@@ -108,6 +118,17 @@ class SMTPClientProtocol:
     def _parse_response(self, code: int, lines: Sequence[str]) -> Optional[SMTPResponse]:
         command, args = self._command_sent, self._args_sent or ()
         self._command_sent = self._args_sent = None
+
+        if self._state is ClientState.authenticating or command == 'AUTH':
+            if code == 334:
+                self._state = ClientState.authenticating
+                return SMTPResponse(code, '\n'.join(lines))
+            elif code == 235:
+                self._state = ClientState.authenticated
+                return SMTPResponse(code, '\n'.join(lines))
+            elif code in (432, 454, 500, 534, 535, 538):
+                self._state = ClientState.ready
+                return SMTPResponse(code, '\n'.join(lines))
 
         if code == 530 and 'AUTH' in self._extensions:
             # As per RFC 4954, authentication cannot be required for some commands
@@ -175,12 +196,6 @@ class SMTPClientProtocol:
             if code == 220:
                 self._state = ClientState.greeting_received
                 return SMTPResponse(code, '\n'.join(lines))
-        elif command == 'AUTH':
-            if code == 235:
-                self._state = ClientState.authenticated
-                return SMTPResponse(code, '\n'.join(lines))
-            elif code in (432, 454, 500, 534, 535, 538):
-                return SMTPResponse(code, '\n'.join(lines))
 
         self._state = ClientState.finished
         raise SMTPProtocolViolation(f'Unexpected response: {code} ' + '\n'.join(lines))
@@ -217,18 +232,34 @@ class SMTPClientProtocol:
         """The set of extensions advertised by the server."""
         return self._extensions
 
-    def authenticate(self, mechanism: str, secret: str) -> None:
+    def authenticate(self, mechanism: str, secret: Optional[str] = None) -> None:
         """
         Authenticate to the server using the given mechanism and an accompanying secret.
 
         :param mechanism: the authentication mechanism (e.g. ``PLAIN`` or ``GSSAPI``)
-        :param secret: the credentials to authenticate with (specific to each authentication
-            mechanism)
+        :param secret: an optional string (usually containing the credentials) that is added as an
+            argument to the ``AUTH XXX`` command
 
         """
         self._require_state(ClientState.ready)
         self._require_extension('AUTH')
-        self._send_command('AUTH', mechanism, secret)
+        self._require_auth_mechanism(mechanism)
+        if secret:
+            self._send_command('AUTH', mechanism, secret)
+        else:
+            self._send_command('AUTH', mechanism)
+
+    def send_authentication_data(self, data: str) -> None:
+        """
+        Send authentication data to the server.
+
+        This method can be called when the server responds with a 334 to an AUTH command.
+
+        :param data: authentication data (ASCII compatible; usually base64 encoded)
+
+        """
+        self._require_state(ClientState.authenticating)
+        self._send_command(data)
 
     def send_greeting(self, domain: str) -> None:
         """

@@ -5,7 +5,8 @@ from typing import Optional, Callable
 import pytest
 
 from smtpproto.protocol import (
-    SMTPClientProtocol, ClientState, SMTPProtocolViolation, SMTPMissingExtension)
+    SMTPClientProtocol, ClientState, SMTPProtocolViolation, SMTPMissingExtension,
+    SMTPUnsupportedAuthMechanism)
 
 
 def call_protocol_method(protocol: SMTPClientProtocol, func: Callable,
@@ -46,11 +47,11 @@ def exchange_greetings(protocol, esmtp=True):
         feed_bytes(protocol, b'250-SMTPUTF8\r\n')
         feed_bytes(protocol, b'250-STARTTLS\r\n')
         feed_bytes(protocol, b'250-SIZE 10000000\r\n')
-        feed_bytes(protocol, b'250 AUTH PLAIN\r\n', 250,
-                   'foo.bar ready\n8BITMIME\nSMTPUTF8\nSTARTTLS\nSIZE 10000000\nAUTH PLAIN',
+        feed_bytes(protocol, b'250 AUTH PLAIN LOGIN\r\n', 250,
+                   'foo.bar ready\n8BITMIME\nSMTPUTF8\nSTARTTLS\nSIZE 10000000\nAUTH PLAIN LOGIN',
                    ClientState.ready)
         assert protocol.extensions == {'8BITMIME', 'SMTPUTF8', 'STARTTLS', 'SIZE', 'AUTH'}
-        assert protocol.auth_mechanisms == {'PLAIN'}
+        assert protocol.auth_mechanisms == {'PLAIN', 'LOGIN'}
         assert protocol.max_message_size == 10000000
     else:
         # Fall back to HELO
@@ -185,6 +186,12 @@ def test_quit(protocol):
     feed_bytes(protocol, b'221 OK\r\n', 221, 'OK', ClientState.finished)
 
 
+def test_auth_with_unsupported_mechanism(protocol):
+    exchange_greetings(protocol)
+    pytest.raises(SMTPUnsupportedAuthMechanism, lambda: protocol.authenticate('XOAUTH2')).\
+        match('XOAUTH2 is not a supported authentication mechanism on this server')
+
+
 def test_auth_plain(protocol):
     exchange_greetings(protocol)
 
@@ -192,6 +199,44 @@ def test_auth_plain(protocol):
                          b'AUTH PLAIN dGVzdDpwYXNz\r\n')
     feed_bytes(protocol, b'235 Authentication successful\r\n', 235, 'Authentication successful',
                ClientState.authenticated)
+
+
+@pytest.mark.parametrize('error_code', [432, 454, 500, 534, 535, 538])
+def test_auth_plain_failure(protocol, error_code):
+    exchange_greetings(protocol)
+    call_protocol_method(protocol, lambda: protocol.authenticate('PLAIN', 'dummy'),
+                         b'AUTH PLAIN dummy\r\n')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error',
+               ClientState.ready)
+
+
+def test_auth_login(protocol):
+    exchange_greetings(protocol)
+
+    call_protocol_method(protocol, lambda: protocol.authenticate('LOGIN'), b'AUTH LOGIN\r\n')
+    feed_bytes(protocol, b'334 VXNlcm5hbWU=\r\n', 334, 'VXNlcm5hbWU=', ClientState.authenticating)
+    call_protocol_method(protocol, lambda: protocol.send_authentication_data('dXNlcg=='),
+                         b'dXNlcg==\r\n')
+    feed_bytes(protocol, b'334 cGFzc3dvcmQ=\r\n', 334, 'cGFzc3dvcmQ=', ClientState.authenticating)
+    call_protocol_method(protocol, lambda: protocol.send_authentication_data('cGFzcw=='),
+                         b'cGFzcw==\r\n')
+    feed_bytes(protocol, b'235 Authentication successful\r\n', 235, 'Authentication successful',
+               ClientState.authenticated)
+
+
+@pytest.mark.parametrize('error_code', [432, 454, 500, 534, 535, 538])
+def test_auth_login_failure(protocol, error_code):
+    exchange_greetings(protocol)
+
+    call_protocol_method(protocol, lambda: protocol.authenticate('LOGIN'), b'AUTH LOGIN\r\n')
+    feed_bytes(protocol, b'334 VXNlcm5hbWU=\r\n', 334, 'VXNlcm5hbWU=', ClientState.authenticating)
+    call_protocol_method(protocol, lambda: protocol.send_authentication_data('dXNlcg=='),
+                         b'dXNlcg==\r\n')
+    feed_bytes(protocol, b'334 cGFzc3dvcmQ=\r\n', 334, 'cGFzc3dvcmQ=', ClientState.authenticating)
+    call_protocol_method(protocol, lambda: protocol.send_authentication_data('cGFzcw=='),
+                         b'cGFzcw==\r\n')
+    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error',
+               ClientState.ready)
 
 
 def test_server_invalid_input(protocol):
@@ -255,12 +300,4 @@ def test_start_data_error(protocol, error_code):
     call_protocol_method(protocol, lambda: protocol.recipient('foo@bar'), b'RCPT TO:<foo@bar>\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
     call_protocol_method(protocol, protocol.start_data, b'DATA\r\n')
-    feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
-
-
-@pytest.mark.parametrize('error_code', [432, 454, 500, 534, 535, 538])
-def test_auth_error(protocol, error_code):
-    exchange_greetings(protocol)
-    call_protocol_method(protocol, lambda: protocol.authenticate('PLAIN', 'dummy'),
-                         b'AUTH PLAIN dummy\r\n')
     feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
