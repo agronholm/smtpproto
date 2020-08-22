@@ -1,9 +1,14 @@
-smtpproto
-=========
+SMTP state-machine protocol (smtpproto)
+=======================================
+
+.. include:: ../README.rst
+   :start-line: 7
 
 .. toctree::
    :maxdepth: 2
 
+   devguide
+   userguide
    api
    versionhistory
 

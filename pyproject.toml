@@ -11,8 +11,9 @@ version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
 [tool.pytest.ini_options]
-addopts = "-rsx --tb=short"
+addopts = "-rsx --tb=short -p no:curio"
 testpaths = "tests"
+filterwarnings = "always"
 
 [tool.coverage.run]
 source = "smtpproto"

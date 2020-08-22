@@ -1,11 +1,10 @@
-import time
 from abc import ABCMeta, abstractmethod
-from base64 import b64encode
-from dataclasses import dataclass, field
-from typing import Tuple, Optional
+from base64 import b64encode, b64decode
+from dataclasses import dataclass
+from typing import AsyncGenerator
 
 
-class SMTPCredentialsProvider(metaclass=ABCMeta):
+class SMTPAuthenticator(metaclass=ABCMeta):
     """Interface for providing credentials for authenticating against SMTP servers."""
 
     @property
@@ -13,20 +12,21 @@ class SMTPCredentialsProvider(metaclass=ABCMeta):
     def mechanism(self) -> str:
         """The name of the authentication mechanism (e.g. ``PLAIN`` or ``GSSAPI``)."""
 
-    def get_credentials_sync(self) -> str:
-        """Retrieve the credentials to be passed to the server."""
-        raise NotImplementedError
+    @abstractmethod
+    def authenticate(self) -> AsyncGenerator[str, str]:
+        """
+        Performs authentication against the SMTP server.
 
-    async def get_credentials_async(self) -> str:
-        """Retrieve the credentials to be passed to the server."""
-        import anyio
-        return await anyio.run_in_thread(self.get_credentials_sync)
+        This method must return an async generator. Any non-empty values the generator yields are
+        sent to the server as authentication data. The response messages from any 334 responses are
+        sent to the generator.
+        """
 
 
 @dataclass
-class PlainCredentialsProvider(SMTPCredentialsProvider):
+class PlainAuthenticator(SMTPAuthenticator):
     """
-    Authenticates against the server using a username/password combination.
+    Authenticates against the server with a username/password combination using the PLAIN method.
 
     :param username: user name to authenticate as
     :param password: password to authenticate with
@@ -39,59 +39,68 @@ class PlainCredentialsProvider(SMTPCredentialsProvider):
     def mechanism(self) -> str:
         return 'PLAIN'
 
-    def get_credentials_sync(self) -> str:
-        joined = (self.username + ':' + self.password).encode('utf-8')
-        return b64encode(joined).decode('ascii')
-
-    async def get_credentials_async(self) -> str:
-        return self.get_credentials_sync()
+    async def authenticate(self) -> AsyncGenerator[str, str]:
+        joined = (self.username + '\x00' + self.password).encode('utf-8')
+        yield b64encode(joined).decode('ascii')
 
 
 @dataclass
-class OAuth2CredentialsProvider(SMTPCredentialsProvider):
+class LoginAuthenticator(SMTPAuthenticator):
     """
-    Authenticates against the server using an OAUTH2 access token.
+    Authenticates against the server with a username/password combination using the LOGIN method.
 
-    The user is responsible for obtaining the access token.
+    :param username: user name to authenticate as
+    :param password: password to authenticate with
+    """
+
+    username: str
+    password: str
+
+    @property
+    def mechanism(self) -> str:
+        return 'LOGIN'
+
+    async def authenticate(self) -> AsyncGenerator[str, str]:
+        for _ in range(2):
+            raw_question = yield
+            question = b64decode(raw_question.encode('ascii')).lower()
+            if question == 'username':
+                yield b64encode(self.username)
+            elif question == 'password':
+                yield b64encode(self.password)
+            else:
+                raise ValueError(f'Unhandled question: {raw_question}')
+
+
+@dataclass
+class OAuth2Authenticator(SMTPAuthenticator):
+    """
+    Authenticates against the server using OAUTH2.
+
+    In order to use this authenticator, you must subclass it and implement the :meth:`get_token`
+    method.
 
     :param username: the user name to authenticate as
     """
 
     username: str
-    _token: Optional[str] = field(init=False, default=None)
-    _expires_at: Optional[float] = field(init=False, default=None)
-
-    def __init__(self, username: str):
-        self.username = username
 
     @property
     def mechanism(self) -> str:
         return 'XOAUTH2'
 
-    def get_credentials_sync(self) -> str:
-        token = self.get_token_sync()
-        return b64encode(
-            f'user={self.username}\x01auth=Bearer {token}\x01\x01'.encode('utf-8')).decode('ascii')
+    async def authenticate(self) -> AsyncGenerator[str, str]:
+        token = await self.get_token()
+        auth_string = f'user={self.username}\x01auth=Bearer {token}\x01\x01'
+        yield b64encode(auth_string.encode('utf-8')).decode('ascii')
 
-    async def get_credentials_async(self) -> str:
-        now = time.monotonic()
-        if not self._expires_at or now >= self._expires_at:
-            self._token, lifetime = await self.get_token_async()
-            self._expires_at = now + lifetime
-
-        auth_string = f'user={self.username}\x01auth=Bearer {self._token}\x01\x01'
-        return b64encode(auth_string.encode('utf-8')).decode('ascii')
-
-    def get_token_sync(self) -> Tuple[str, float]:
+    @abstractmethod
+    async def get_token(self) -> str:
         """
         Obtain a new access token.
 
-        :return: tuple of (access token, token lifetime in seconds)
+        Implementors should cache the token and its expiration time and only obtain a new one if
+        the old one has expired or is about to.
 
+        :return: the access token
         """
-        raise NotImplementedError
-
-    async def get_token_async(self) -> Tuple[str, float]:
-        """Asynchronous version of :meth:`get_token_sync`."""
-        import anyio
-        return await anyio.run_in_thread(self.get_token_sync)
