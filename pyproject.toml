@@ -16,7 +16,7 @@ testpaths = "tests"
 filterwarnings = "always"
 
 [tool.coverage.run]
-source = "smtpproto"
+source = ["smtpproto"]
 
 [tool.coverage.report]
 show_missing = true
