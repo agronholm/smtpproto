@@ -1,15 +1,15 @@
 import logging
 import socket
-from functools import partial
-
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
+from functools import partial
 from ssl import SSLContext
 from typing import Optional, Iterable, Callable, Union, List, Dict, Any
 
-from anyio import connect_tcp, fail_after, start_blocking_portal, aclose_forcefully
+from anyio import (
+    connect_tcp, fail_after, start_blocking_portal, aclose_forcefully, BrokenResourceError)
 from anyio.abc import SocketStream, BlockingPortal, AsyncResource
 from anyio.streams.tls import TLSStream
 
@@ -27,7 +27,7 @@ class AsyncSMTPClient(AsyncResource):
     :param host: host name or IP address of the SMTP server
     :param port: port on the SMTP server to connect to
     :param connect_timeout: connection timeout (in seconds)
-    :param read_timeout: timeout for reading responses (in seconds)
+    :param timeout: timeout for sending requests and reading responses (in seconds)
     :param domain: domain name to send to the server as part of the greeting message
     :param ssl_context: SSL context to use for establishing TLS encrypted sessions
     :param authenticator: authenticator to use for authenticating with the SMTP server
@@ -36,7 +36,7 @@ class AsyncSMTPClient(AsyncResource):
     host: str
     port: int = 587
     connect_timeout: float = 30
-    read_timeout: float = 60
+    timeout: float = 60
     domain: str = field(default_factory=socket.gethostname)
     ssl_context: Optional[SSLContext] = None
     authenticator: Optional[SMTPAuthenticator] = None
@@ -73,7 +73,7 @@ class AsyncSMTPClient(AsyncResource):
                 if self.authenticator:
                     auth_gen = self.authenticator.authenticate()
                     try:
-                        auth_data = await auth_gen.asend(None)
+                        auth_data = await auth_gen.__anext__()
                         response = await self._send_command(
                             self._protocol.authenticate, self.authenticator.mechanism, auth_data)
                         while self._protocol.state is ClientState.authenticating:
@@ -103,7 +103,14 @@ class AsyncSMTPClient(AsyncResource):
                 raise SMTPException('Not connected')
 
             if self._protocol.needs_incoming_data:
-                data = await self._stream.receive()
+                try:
+                    async with fail_after(self.timeout):
+                        data = await self._stream.receive()
+                except (BrokenResourceError, TimeoutError):
+                    await aclose_forcefully(self._stream)
+                    self._stream = None
+                    raise
+
                 logger.debug('Received: %s', data)
                 response = self._protocol.feed_bytes(data)
                 if response:
@@ -112,16 +119,22 @@ class AsyncSMTPClient(AsyncResource):
                     else:
                         return response
 
-            data = self._protocol.get_outgoing_data()
-            if data:
-                await self._stream.send(data)
-                logger.debug('Sent: %s', data)
+                await self._flush_output()
 
     async def _flush_output(self) -> None:
+        if not self._stream:
+            raise SMTPException('Not connected')
+
         data = self._protocol.get_outgoing_data()
-        logger.debug('Sent: %s', data)
-        async with fail_after(self.read_timeout):
-            await self._stream.send(data)
+        if data:
+            logger.debug('Sent: %s', data)
+            try:
+                async with fail_after(self.timeout):
+                    await self._stream.send(data)
+            except (BrokenResourceError, TimeoutError):
+                await aclose_forcefully(self._stream)
+                self._stream = None
+                raise
 
     async def _send_command(self, command: Callable, *args) -> SMTPResponse:
         if not self._stream:
@@ -187,5 +200,8 @@ class SyncSMTPClient:
     def send_message(self, message: EmailMessage, *,
                      sender: Union[str, Address, None] = None,
                      recipients: Optional[Iterable[str]] = None) -> SMTPResponse:
+        if not self._portal:
+            raise SMTPException('Not connected')
+
         func = partial(self._async_client.send_message, sender=sender, recipients=recipients)
         return self._portal.call(func, message)

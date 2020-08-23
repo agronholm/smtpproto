@@ -62,17 +62,16 @@ class LoginAuthenticator(SMTPAuthenticator):
 
     async def authenticate(self) -> AsyncGenerator[str, str]:
         for _ in range(2):
-            raw_question = yield
+            raw_question = yield ''
             question = b64decode(raw_question.encode('ascii')).lower()
             if question == 'username':
-                yield b64encode(self.username)
+                yield b64encode(self.username.encode('utf-8')).decode('ascii')
             elif question == 'password':
-                yield b64encode(self.password)
+                yield b64encode(self.password.encode('utf-8')).decode('ascii')
             else:
                 raise ValueError(f'Unhandled question: {raw_question}')
 
 
-@dataclass
 class OAuth2Authenticator(SMTPAuthenticator):
     """
     Authenticates against the server using OAUTH2.
@@ -83,7 +82,8 @@ class OAuth2Authenticator(SMTPAuthenticator):
     :param username: the user name to authenticate as
     """
 
-    username: str
+    def __init__(self, username: str):
+        self.username = username
 
     @property
     def mechanism(self) -> str:
