@@ -3,11 +3,11 @@
 .. image:: https://coveralls.io/repos/github/agronholm/smtpproto/badge.svg?branch=master
   :target: https://coveralls.io/github/agronholm/smtpproto?branch=master
   :alt: Code Coverage
-.. image:: https://readthedocs.org/projects/smtpproto/badge/?version=latest
-  :target: https://smtpproto.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/smtpproto/badge/
+  :target: https://smtpproto.readthedocs.org/
   :alt: Documentation
 
-This library contains a sans-io_ implementation of the (client-side) ESMTP_ protocol.
+This library contains a (client-side) sans-io_ implementation of the ESMTP_ protocol.
 A concrete, asynchronous I/O implementation is also provided, via the AnyIO_ library.
 
 The following SMTP extensions are supported:
@@ -17,6 +17,8 @@ The following SMTP extensions are supported:
 * SIZE_ (max message size reporting only)
 * SMTPUTF8_
 * STARTTLS_
+
+You can find the documentation `here <https://smtpproto.readthedocs.org/>`_.
 
 .. _sans-io: https://sans-io.readthedocs.io/
 .. _ESMTP: https://tools.ietf.org/html/rfc5321

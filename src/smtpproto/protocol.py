@@ -11,16 +11,16 @@ response_re = re.compile('(\\d+)([- ])(.*)$')
 
 class ClientState(Enum):
     """Enumerates all possible protocol states."""
-    greeting_expected = auto()
-    greeting_received = auto()
-    authenticating = auto()
-    authenticated = auto()
-    ready = auto()
-    mailtx = auto()
-    recipient_sent = auto()
-    send_data = auto()
-    data_sent = auto()
-    finished = auto()
+    greeting_expected = auto()  #: expecting a greeting from the server
+    greeting_received = auto()  #: received a greeting from the server, ready to authenticate
+    authenticating = auto()  #: authentication in progress
+    authenticated = auto()  #: authentication done
+    ready = auto()  #: ready to send commands
+    mailtx = auto()  #: in a mail transaction
+    recipient_sent = auto()  #: sent at least one recipient
+    send_data = auto()  #: ready to send the message data
+    data_sent = auto()  #: message data sent
+    finished = auto()  #: session finished
 
 
 class SMTPException(Exception):

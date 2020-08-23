@@ -5,26 +5,14 @@ Protocol
 --------
 
 .. automodule:: smtpproto.protocol
-    :members:
-    :show-inheritance:
+    :member-order: bysource
 
 Authentication
 --------------
 
 .. automodule:: smtpproto.auth
-    :members:
-    :show-inheritance:
 
-Async client implementation
----------------------------
+Concrete client implementation
+------------------------------
 
-.. automodule:: smtpproto.async_client
-    :members:
-    :show-inheritance:
-
-Synchronous client implementation
----------------------------------
-
-.. automodule:: smtpproto.sync_client
-    :members:
-    :show-inheritance:
+.. automodule:: smtpproto.client

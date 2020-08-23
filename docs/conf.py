@@ -22,11 +22,15 @@ language = None
 
 exclude_patterns = ['_build']
 pygments_style = 'sphinx'
-highlight_language = 'python3'
+autodoc_default_options = {
+    'members': True,
+    'show-inheritance': True
+}
 todo_include_todos = False
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 htmlhelp_basename = project + 'doc'
 
-intersphinx_mapping = {'python': ('http://docs.python.org/3/', None)}
+intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
+                       'anyio': ('https://anyio.readthedocs.org/en/latest/', None)}

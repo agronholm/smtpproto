@@ -2,7 +2,10 @@ SMTP state-machine protocol (smtpproto)
 =======================================
 
 .. include:: ../README.rst
-   :start-line: 7
+   :start-after: Documentation
+
+Table of Contents
+-----------------
 
 .. toctree::
    :maxdepth: 2
@@ -12,9 +15,8 @@ SMTP state-machine protocol (smtpproto)
    api
    versionhistory
 
-
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

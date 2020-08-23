@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AsyncSMTPClient(AsyncResource):
     """
-    An example asynchronous SMTP client.
+    An asynchronous SMTP client.
+
+    This runs on asyncio or any other backend supported by AnyIO.
+
+    It is recommended that this client is used as an async context manager instead of manually
+    calling :meth:`~connect` and :meth:`aclose`, if possible.
 
     :param host: host name or IP address of the SMTP server
     :param port: port on the SMTP server to connect to
@@ -51,6 +56,7 @@ class AsyncSMTPClient(AsyncResource):
         await self.aclose()
 
     async def connect(self) -> None:
+        """Connect to the SMTP server."""
         if not self._stream:
             async with fail_after(self.connect_timeout):
                 self._stream = await connect_tcp(self.host, self.port)
@@ -89,6 +95,7 @@ class AsyncSMTPClient(AsyncResource):
                 raise
 
     async def aclose(self) -> None:
+        """Close the connection, if connected."""
         if self._stream:
             try:
                 if self._protocol.state is not ClientState.finished:
@@ -166,6 +173,24 @@ class AsyncSMTPClient(AsyncResource):
 
 
 class SyncSMTPClient:
+    """
+    A synchronous (blocking) SMTP client.
+
+    It is recommended that this client is used as a context manager instead of manually calling
+    :meth:`~connect` and :meth:`close`, if possible.
+
+    :param host: host name or IP address of the SMTP server
+    :param port: port on the SMTP server to connect to
+    :param connect_timeout: connection timeout (in seconds)
+    :param timeout: timeout for sending requests and reading responses (in seconds)
+    :param domain: domain name to send to the server as part of the greeting message
+    :param ssl_context: SSL context to use for establishing TLS encrypted sessions
+    :param authenticator: authenticator to use for authenticating with the SMTP server
+    :param async_backend: name of the AnyIO-supported asynchronous backend
+    :param async_backend_options: dictionary of keyword arguments passed to
+        :func:`anyio.start_blocking_portal`
+    """
+
     def __init__(self, *args, async_backend: str = 'asyncio',
                  async_backend_options: Optional[Dict[str, Any]] = None, **kwargs):
         self._async_backend = async_backend
@@ -181,6 +206,7 @@ class SyncSMTPClient:
         self.close()
 
     def connect(self) -> None:
+        """Connect to the SMTP server."""
         if not self._portal:
             self._portal = start_blocking_portal(self._async_backend, self._async_backend_options)
             try:
@@ -190,6 +216,7 @@ class SyncSMTPClient:
                 raise
 
     def close(self) -> None:
+        """Close the connection, if connected."""
         if self._portal:
             try:
                 self._portal.call(self._async_client.aclose)

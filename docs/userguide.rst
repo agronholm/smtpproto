@@ -1,38 +1,35 @@
 Using the concrete I/O implementations
 ======================================
 
+.. py:currentmodule:: smtpproto.client
+
 In addition to the sans-io protocol implementation, this library also provides both an asynchronous
-and a synchronous SMTP client class (:class:`~smtpproto.client.AsyncSMTPClient` and
-:class:`~smtpproto.client.SyncSMTPClient`, respectively).
+and a synchronous SMTP client class (:class:`~AsyncSMTPClient` and :class:`~SyncSMTPClient`,
+respectively).
 
 Most SMTP servers, however, require some form of authentication. While it would be unfeasible to
 provide solutions for every possible situation, the examples below should cover some very common
 cases and should give you a general idea of how to work with SMTP authentication.
 
-To run the examples below, you need to install a couple dependencies:
+For the OAuth2 examples (further below), you need to install a couple dependencies:
 
 * aiohttp_
-* jwt_
+* PyJWT_
 
 .. _aiohttp: https://pypi.org/project/aiohttp/
-.. _jwt: https://pypi.org/project/jwt/
+.. _PyJWT: https://pypi.org/project/pyjwt/
 
 
 Sending mail via a local SMTP server
-====================================
+------------------------------------
 
 .. code-block:: python3
 
-    from dataclasses import dataclass
-    from datetime import datetime, timedelta
     from email.message import EmailMessage
 
-    import aiohttp
-    import jwt
-
     import anyio
-    from smtpproto.auth import OAuth2CredentialsProvider
-    from smtpproto.async_client import AsyncSMTPClient
+    from smtpproto.auth import PlainAuthenticator
+    from smtpproto.client import AsyncSMTPClient
 
 
     async def main():
@@ -40,7 +37,7 @@ Sending mail via a local SMTP server
             await client.send_message(message)
 
     # If your SMTP server requires basic authentication, this is where you enter that info
-    provider = PlainCredentialsProvider(username='myuser', password='mypassword')
+    authenticator = PlainAuthenticator(username='myuser', password='mypassword')
 
     # The message you want to send
     message = EmailMessage()
@@ -54,11 +51,11 @@ Sending mail via a local SMTP server
 
 
 Sending mail via Gmail
-======================
+----------------------
 
 The `developer documentation`_ for the G Suite describes how to use the XOAUTH2 mechanism for
 authenticating against the Gmail SMTP server. The following is a practical example of how to extend
-the :class:`~smtpproto.auth.OAuth2CredentialsProvider` class to obtain an access token and use it
+the :class:`~.auth.OAuth2Authenticator` class to obtain an access token and use it
 to send an email via Gmail.
 
 The following example assumes the presence of an existing `G Suite service account`_ authorized to
@@ -66,7 +63,6 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
 
 .. code-block:: python3
 
-    from dataclasses import dataclass
     from datetime import datetime, timedelta
     from email.message import EmailMessage
 
@@ -74,14 +70,15 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
     import jwt
 
     import anyio
-    from smtpproto.auth import OAuth2CredentialsProvider
-    from smtpproto.async_client import AsyncSMTPClient
+    from smtpproto.auth import OAuth2Authenticator
+    from smtpproto.client import AsyncSMTPClient
 
 
-    @dataclass
-    class GMailOAuth2Provider(OAuth2CredentialsProvider):
-        client_id: str
-        private_key: str
+    class GMailAuthenticator(OAuth2Authenticator):
+        def __init__(self, username: str, client_id: str, private_key: str):
+            super().__init__(username)
+            self.client_id = client_id
+            self.private_key = private_key
 
         async def get_token_async(self):
             webtoken = jwt.encode({
@@ -103,7 +100,7 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
 
 
     async def main():
-        async with AsyncSMTPClient(host='smtp.gmail.com', credentials_provider=provider) as client:
+        async with AsyncSMTPClient(host='smtp.gmail.com', authenticator=authenticator) as client:
             await client.send_message(message)
 
     # Your gmail user name
@@ -112,7 +109,7 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
     # Service account ID and private key – these have to be obtained from Gmail
     client_id = 'yourserviceaccount@yourdomain.iam.gserviceaccount.com'
     private_key = '-----BEGIN PRIVATE KEY-----\n...-----END PRIVATE KEY-----\n'
-    provider = GMailOAuth2Provider(username=me, client_id=client_id, private_key=private_key)
+    authenticator = GMailAuthenticator(username=me, client_id=client_id, private_key=private_key)
 
     # The message you want to send
     message = EmailMessage()
@@ -129,7 +126,10 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
 
 
 Sending mail via Office 365
-===========================
+---------------------------
+
+.. warning:: It is currently not clear what actual permissions the service account requires.
+    As such, this example *should* work but has never been successfully tested.
 
 The following example assumes the presence of a registered `Azure application`_ authorized to
 send email via SMTP (using the ``SMTP.Send`` scope). It uses the `device code flow`_
@@ -138,7 +138,8 @@ to obtain an access token.
 In order for the device code flow to work for the registered application, the following settings
 must be in place:
 
-* The redirect URI for the application must be ``https://login.microsoftonline.com/common/oauth2/nativeclient``
+* The redirect URI for the application must be
+  ``https://login.microsoftonline.com/common/oauth2/nativeclient``
 * The ``Treat application as a public client`` option must be enabled
 * The ``SMTP.Send`` permission from ``Microsoft Graph`` must be added in the configured permissions
 
@@ -146,21 +147,21 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
 
 .. code-block:: python3
 
-    from dataclasses import dataclass
     from email.message import EmailMessage
 
     import aiohttp
 
     import anyio
-    from smtpproto.auth import OAuth2CredentialsProvider
-    from smtpproto.async_client import AsyncSMTPClient
+    from smtpproto.auth import OAuth2Authenticator
+    from smtpproto.client import AsyncSMTPClient
 
 
-    @dataclass
-    class AzureOAuth2Provider(OAuth2CredentialsProvider):
-        tenant_id: str
-        client_id: str
-        client_secret: str
+    class AzureAuthenticator(OAuth2Authenticator):
+        def __init__(self, username: str, tenant_id, client_id: str, client_secret: str):
+            super().__init__(username)
+            self.tenant_id = tenant_id
+            self.client_id = client_id
+            self.client_secret = client_secret
 
         async def get_token_async(self):
             data = {'client_id': self.client_id,
@@ -176,7 +177,8 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
 
 
     async def main():
-        async with AsyncSMTPClient(host='smtp.office365.com', credentials_provider=provider) as client:
+        async with AsyncSMTPClient(host='smtp.office365.com',
+                                   authenticator=authenticator) as client:
             await client.send_message(message)
 
     # Your Office 365 username/email address
@@ -186,8 +188,8 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
     tenant_id = '11111111-1111-1111-1111-111111111111'
     client_id = '11111111-1111-1111-1111-111111111111'
     client_secret = '...'
-    provider = AzureOAuth2Provider(username=me, tenant_id=tenant_id, client_id=client_id,
-                                   client_secret=client_secret)
+    authenticator = AzureAuthenticator(username=me, tenant_id=tenant_id, client_id=client_id,
+                                       client_secret=client_secret)
 
     # The message you want to send
     message = EmailMessage()
@@ -200,5 +202,5 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
     anyio.run(main)
 
 .. _Azure application: https://docs.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth#register-your-application
-.. _client credentials grant flow: https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow
+.. _device code flow: https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code
 .. _Security defaults: https://docs.microsoft.com/fi-fi/azure/active-directory/fundamentals/concept-fundamentals-security-defaults
