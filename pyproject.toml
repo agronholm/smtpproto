@@ -11,7 +11,7 @@ version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
 [tool.pytest.ini_options]
-addopts = "-rsx --tb=short -p no:curio"
+addopts = "-rsx --tb=short"
 testpaths = "tests"
 filterwarnings = "always"
 
