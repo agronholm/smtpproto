@@ -85,16 +85,34 @@ class SMTPClientProtocol:
             raise SMTPUnsupportedAuthMechanism(
                 f'{mechanism} is not a supported authentication mechanism on this server')
 
-    def _send_command(self, command: str, *args: str) -> None:
+    def _encode_address(self, address: Union[str, Address]) -> bytes:
+        if isinstance(address, Address):
+            address_str = f'{address.username}@{address.domain}'
+        else:
+            address_str = address
+
+        if 'SMTPUTF8' in self._extensions:
+            return address_str.encode('utf-8')
+
+        # If SMPTUTF8 is not supported, the address must be ASCII compatible
+        try:
+            return address_str.encode('ascii')
+        except UnicodeEncodeError:
+            raise SMTPProtocolViolation(
+                f'The address {address_str!r} requires UTF-8 encoding but the server does not '
+                f'support the SMTPUTF8 extension')
+
+    def _send_command(self, command: str, *args: Union[str, bytes]) -> None:
         if self._command_sent is not None:
             raise SMTPProtocolViolation('Tried to send a command before the previous one received '
                                         'a response')
 
-        line = command
+        line = command.encode('ascii')
         if args:
-            line += ' ' + ' '.join(args)
+            line += b' ' + b' '.join(arg.encode('ascii') if isinstance(arg, str) else arg
+                                     for arg in args)
 
-        self._out_buffer += line.encode('ascii') + b'\r\n'
+        self._out_buffer += line + b'\r\n'
         self._command_sent = command
         self._args_sent = args
 
@@ -291,9 +309,10 @@ class SMTPClientProtocol:
         args = []
         if '8BITMIME' in self._extensions:
             args.append('BODY=8BITMIME')
+        if 'SMTPUTF8' in self._extensions:
+            args.append('SMTPUTF8')
 
-        address = sender.addr_spec if isinstance(sender, Address) else sender
-        self._send_command('MAIL', 'FROM:<' + address + '>', *args)
+        self._send_command('MAIL', b'FROM:<' + self._encode_address(sender) + b'>', *args)
 
     def recipient(self, recipient: Union[str, Address]) -> None:
         """
@@ -305,8 +324,7 @@ class SMTPClientProtocol:
 
         """
         self._require_state(ClientState.mailtx, ClientState.recipient_sent)
-        address = recipient.addr_spec if isinstance(recipient, Address) else recipient
-        self._send_command('RCPT', f'TO:<{address}>')
+        self._send_command('RCPT', b'TO:<' + self._encode_address(recipient) + b'>')
 
     def start_data(self) -> None:
         """
