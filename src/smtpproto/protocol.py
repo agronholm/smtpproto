@@ -64,7 +64,7 @@ class SMTPClientProtocol:
     _response_code: Optional[int] = field(init=False, default=None)
     _response_lines: List[str] = field(init=False, default_factory=list)
     _command_sent: Optional[str] = field(init=False, default=None)
-    _args_sent: Optional[Tuple[str, ...]] = field(init=False, default=None)
+    _args_sent: Optional[Tuple[bytes, ...]] = field(init=False, default=None)
     _extensions: FrozenSet[str] = field(init=False, default_factory=frozenset)
     _auth_mechanisms: FrozenSet[str] = field(init=False, default_factory=frozenset)
     _max_message_size: Optional[int] = field(init=False, default=None)
@@ -108,13 +108,13 @@ class SMTPClientProtocol:
                                         'a response')
 
         line = command.encode('ascii')
-        if args:
-            line += b' ' + b' '.join(arg.encode('ascii') if isinstance(arg, str) else arg
-                                     for arg in args)
+        args_encoded = tuple(arg.encode('ascii') if isinstance(arg, str) else arg for arg in args)
+        if args_encoded:
+            line += b' ' + b' '.join(args_encoded)
 
         self._out_buffer += line + b'\r\n'
         self._command_sent = command
-        self._args_sent = args
+        self._args_sent = args_encoded
 
     def _parse_extensions(self, lines: Iterable[str]) -> None:
         auth_mechanisms: List[str] = []
