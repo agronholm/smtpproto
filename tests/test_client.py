@@ -75,7 +75,7 @@ class TestAsyncClient:
             @syntax('AUTH <secret>')
             async def smtp_AUTH(self, arg):
                 credentials = arg.split(' ')[1]
-                expected = 'dXNlcm5hbWUAcGFzc3dvcmQ='
+                expected = 'AHVzZXJuYW1lAHBhc3N3b3Jk'
                 if credentials == expected and success:
                     await self.push('235 Authentication successful')
                 else:
@@ -125,7 +125,7 @@ class TestSyncClient:
             @syntax('AUTH <secret>')
             async def smtp_AUTH(self, arg):
                 credentials = arg.split(' ')[1]
-                expected = 'dXNlcm5hbWUAcGFzc3dvcmQ='
+                expected = 'AHVzZXJuYW1lAHBhc3N3b3Jk'
                 if credentials == expected and success:
                     await self.push('235 Authentication successful')
                 else:

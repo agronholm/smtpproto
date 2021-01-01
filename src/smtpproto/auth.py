@@ -30,17 +30,20 @@ class PlainAuthenticator(SMTPAuthenticator):
 
     :param username: user name to authenticate as
     :param password: password to authenticate with
+    :param authorization_id: optional authorization ID
     """
 
     username: str
     password: str
+    authorization_id: str = ''
 
     @property
     def mechanism(self) -> str:
         return 'PLAIN'
 
     async def authenticate(self) -> AsyncGenerator[str, str]:
-        joined = (self.username + '\x00' + self.password).encode('utf-8')
+        joined = (self.authorization_id + '\x00' + self.username + '\x00'
+                  + self.password).encode('utf-8')
         yield b64encode(joined).decode('ascii')
 
 

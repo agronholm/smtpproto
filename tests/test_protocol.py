@@ -195,8 +195,8 @@ def test_auth_with_unsupported_mechanism(protocol):
 def test_auth_plain(protocol):
     exchange_greetings(protocol)
 
-    call_protocol_method(protocol, lambda: protocol.authenticate('PLAIN', 'dGVzdDpwYXNz'),
-                         b'AUTH PLAIN dGVzdDpwYXNz\r\n')
+    call_protocol_method(protocol, lambda: protocol.authenticate('PLAIN', 'AHRlc3QAcGFzcw=='),
+                         b'AUTH PLAIN AHRlc3QAcGFzcw==\r\n')
     feed_bytes(protocol, b'235 Authentication successful\r\n', 235, 'Authentication successful',
                ClientState.authenticated)
 
