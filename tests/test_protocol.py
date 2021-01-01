@@ -65,7 +65,12 @@ def exchange_greetings(protocol, esmtp=True):
 
 def start_mail_tx(protocol):
     # Start a mail transaction
-    extra_args = b' BODY=8BITMIME' if '8BITMIME' in protocol.extensions else b''
+    extra_args = b''
+    if '8BITMIME' in protocol.extensions:
+        extra_args += b' BODY=8BITMIME'
+    if 'SMTPUTF8' in protocol.extensions:
+        extra_args += b' SMTPUTF8'
+
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar.com'),
                          b'MAIL FROM:<foo@bar.com>' + extra_args + b'\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
@@ -87,6 +92,14 @@ def start_mail_tx(protocol):
                'Start mail input; end with <CRLF>.<CRLF>', ClientState.send_data)
 
 
+@pytest.fixture(params=[
+    'héllö@example.org',
+    Address('Héllö World', 'héllö', 'example.org')
+], ids=['str', 'object'])
+def unicode_address(request):
+    return request.param
+
+
 @pytest.fixture
 def protocol():
     proto = SMTPClientProtocol()
@@ -100,7 +113,7 @@ def protocol():
     pytest.param(False, 'base64', 'This is a =?utf-8?q?subj=C3=ABct?=',
                  'VGhpcyBpcyDDpCB0ZXN0IG1lc3NhZ2UuCg==', id='7bit')
 ])
-def test_send_mail_utf8(protocol, esmtp, expected_cte, expected_subject, expected_body):
+def test_send_mail_utf8_content(protocol, esmtp, expected_cte, expected_subject, expected_body):
     exchange_greetings(protocol, esmtp=esmtp)
     start_mail_tx(protocol)
 
@@ -114,6 +127,29 @@ def test_send_mail_utf8(protocol, esmtp, expected_cte, expected_subject, expecte
                          f'MIME-Version: 1.0\r\n\r\n'
                          f'{expected_body}\r\n.\r\n'.encode('utf-8'))
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.ready)
+
+
+def test_send_mail_utf8_addresses(protocol, unicode_address):
+    exchange_greetings(protocol)
+    protocol.mail(unicode_address)
+    feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
+    protocol.recipient(unicode_address)
+    feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.recipient_sent)
+
+
+def test_send_mail_unicode_sender_encoding_error(protocol, unicode_address):
+    exchange_greetings(protocol, esmtp=False)
+    exc = pytest.raises(SMTPProtocolViolation, protocol.mail, unicode_address)
+    exc.match("^The address 'héllö@example.org' requires UTF-8")
+
+
+def test_send_mail_unicode_recipient_encoding_error(protocol, unicode_address):
+    exchange_greetings(protocol, esmtp=False)
+    protocol.mail('hello@example.org')
+    feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
+
+    exc = pytest.raises(SMTPProtocolViolation, protocol.recipient, unicode_address)
+    exc.match("^The address 'héllö@example.org' requires UTF-8")
 
 
 def test_send_mail_escape_dots(protocol):
@@ -158,7 +194,7 @@ def test_double_command(protocol):
 def test_authentication_required(protocol):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar.com'),
-                         b'MAIL FROM:<foo@bar.com> BODY=8BITMIME\r\n')
+                         b'MAIL FROM:<foo@bar.com> BODY=8BITMIME SMTPUTF8\r\n')
     feed_bytes(protocol, b'530 Authentication required\r\n', 530, 'Authentication required')
 
 
@@ -277,7 +313,7 @@ def test_helo_error(protocol, error_code):
 def test_mail_error(protocol, error_code):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar'),
-                         b'MAIL FROM:<foo@bar> BODY=8BITMIME\r\n')
+                         b'MAIL FROM:<foo@bar> BODY=8BITMIME SMTPUTF8\r\n')
     feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
 
 
@@ -285,7 +321,7 @@ def test_mail_error(protocol, error_code):
 def test_rcpt_error(protocol, error_code):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar'),
-                         b'MAIL FROM:<foo@bar> BODY=8BITMIME\r\n')
+                         b'MAIL FROM:<foo@bar> BODY=8BITMIME SMTPUTF8\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
     call_protocol_method(protocol, lambda: protocol.recipient('foo@bar'), b'RCPT TO:<foo@bar>\r\n')
     feed_bytes(protocol, f'{error_code} Error\r\n'.encode(), error_code, 'Error')
@@ -295,7 +331,7 @@ def test_rcpt_error(protocol, error_code):
 def test_start_data_error(protocol, error_code):
     exchange_greetings(protocol)
     call_protocol_method(protocol, lambda: protocol.mail('foo@bar'),
-                         b'MAIL FROM:<foo@bar> BODY=8BITMIME\r\n')
+                         b'MAIL FROM:<foo@bar> BODY=8BITMIME SMTPUTF8\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
     call_protocol_method(protocol, lambda: protocol.recipient('foo@bar'), b'RCPT TO:<foo@bar>\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK')
