@@ -63,15 +63,15 @@ def exchange_greetings(protocol, esmtp=True):
         assert protocol.max_message_size is None
 
 
-def start_mail_tx(protocol):
+def start_mail_tx(protocol, smtputf8=True):
     # Start a mail transaction
     extra_args = b''
     if '8BITMIME' in protocol.extensions:
         extra_args += b' BODY=8BITMIME'
-    if 'SMTPUTF8' in protocol.extensions:
+    if smtputf8 and 'SMTPUTF8' in protocol.extensions:
         extra_args += b' SMTPUTF8'
 
-    call_protocol_method(protocol, lambda: protocol.mail('foo@bar.com'),
+    call_protocol_method(protocol, lambda: protocol.mail('foo@bar.com', smtputf8=smtputf8),
                          b'MAIL FROM:<foo@bar.com>' + extra_args + b'\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
 
@@ -108,14 +108,17 @@ def protocol():
     return proto
 
 
-@pytest.mark.parametrize('esmtp, expected_cte, expected_subject, expected_body', [
-    pytest.param(True, '8bit', 'This is a subjëct', 'This is ä test message.', id='8bit'),
-    pytest.param(False, 'base64', 'This is a =?utf-8?q?subj=C3=ABct?=',
-                 'VGhpcyBpcyDDpCB0ZXN0IG1lc3NhZ2UuCg==', id='7bit')
+@pytest.mark.parametrize('esmtp, smtputf8, expected_cte, expected_subject, expected_body', [
+    pytest.param(True, True, '8bit', 'This is a subjëct', 'This is ä test message.', id='8bit'),
+    pytest.param(False, True, 'base64', 'This is a =?utf-8?q?subj=C3=ABct?=',
+                 'VGhpcyBpcyDDpCB0ZXN0IG1lc3NhZ2UuCg==', id='7bit'),
+    pytest.param(True, False, '8bit', 'This is a =?utf-8?q?subj=C3=ABct?=',
+                 'This is ä test message.', id='smtputf8_opt_out')
 ])
-def test_send_mail_utf8_content(protocol, esmtp, expected_cte, expected_subject, expected_body):
+def test_send_mail_utf8_content(protocol, esmtp, smtputf8, expected_cte, expected_subject,
+                                expected_body):
     exchange_greetings(protocol, esmtp=esmtp)
-    start_mail_tx(protocol)
+    start_mail_tx(protocol, smtputf8=smtputf8)
 
     message = EmailMessage()
     message['Subject'] = 'This is a subjëct'
@@ -143,9 +146,25 @@ def test_send_mail_unicode_sender_encoding_error(protocol, unicode_address):
     exc.match("^The address 'héllö@example.org' requires UTF-8")
 
 
+def test_send_mail_unicode_sender_no_smtputf8_encoding_error(protocol, unicode_address):
+    exchange_greetings(protocol, esmtp=True)
+    exc = pytest.raises(SMTPProtocolViolation, protocol.mail, unicode_address,
+                        smtputf8=False)
+    exc.match("^The address 'héllö@example.org' requires UTF-8")
+
+
 def test_send_mail_unicode_recipient_encoding_error(protocol, unicode_address):
     exchange_greetings(protocol, esmtp=False)
     protocol.mail('hello@example.org')
+    feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
+
+    exc = pytest.raises(SMTPProtocolViolation, protocol.recipient, unicode_address)
+    exc.match("^The address 'héllö@example.org' requires UTF-8")
+
+
+def test_send_mail_unicode_recipient_no_smtputf8_encoding_error(protocol, unicode_address):
+    exchange_greetings(protocol, esmtp=True)
+    protocol.mail('hello@example.org', smtputf8=False)
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.mailtx)
 
     exc = pytest.raises(SMTPProtocolViolation, protocol.recipient, unicode_address)
