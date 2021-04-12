@@ -99,10 +99,16 @@ class SMTPClientProtocol:
         try:
             return address_str.encode('ascii')
         except UnicodeEncodeError:
-            raise SMTPProtocolViolation(
-                f'The address {address_str!r} requires UTF-8 encoding but the server does not '
-                'support the SMTPUTF8 extension or SMTPUTF8 was not specified in the mail command'
-            )
+            if 'SMTPUTF8' in self._extensions:
+                raise SMTPProtocolViolation(
+                    f'The address {address_str!r} requires UTF-8 encoding but `smtputf8` was not '
+                    'specified in the mail command'
+                )
+            else:
+                raise SMTPProtocolViolation(
+                    f'The address {address_str!r} requires UTF-8 encoding but the server does not '
+                    'support the SMTPUTF8 extension'
+                )
 
     def _send_command(self, command: str, *args: Union[str, bytes]) -> None:
         if self._command_sent is not None:

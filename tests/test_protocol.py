@@ -143,14 +143,19 @@ def test_send_mail_utf8_addresses(protocol, unicode_address):
 def test_send_mail_unicode_sender_encoding_error(protocol, unicode_address):
     exchange_greetings(protocol, esmtp=False)
     exc = pytest.raises(SMTPProtocolViolation, protocol.mail, unicode_address)
-    exc.match("^The address 'héllö@example.org' requires UTF-8")
+    exc.match(
+        "^The address 'héllö@example.org' requires UTF-8 encoding but the server does not support "
+        "the SMTPUTF8 extension"
+    )
 
 
 def test_send_mail_unicode_sender_no_smtputf8_encoding_error(protocol, unicode_address):
     exchange_greetings(protocol, esmtp=True)
     exc = pytest.raises(SMTPProtocolViolation, protocol.mail, unicode_address,
                         smtputf8=False)
-    exc.match("^The address 'héllö@example.org' requires UTF-8")
+    exc.match(
+        "^The address 'héllö@example.org' requires UTF-8 encoding but `smtputf8` was not specified"
+    )
 
 
 def test_send_mail_unicode_recipient_encoding_error(protocol, unicode_address):
