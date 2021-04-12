@@ -59,7 +59,7 @@ class SMTPClientProtocol:
     """The (E)SMTP protocol state machine."""
 
     _state: ClientState = field(init=False, default=ClientState.greeting_expected)
-    _smtputf8_message: bool = field(init=False, default=False)
+    _smtputf8_message: bool = field(init=False, default=True)
     _out_buffer: bytes = field(init=False, default=b'')
     _in_buffer: bytes = field(init=False, default=b'')
     _response_code: Optional[int] = field(init=False, default=None)
@@ -299,18 +299,20 @@ class SMTPClientProtocol:
         """Send the QUIT command (required to cleanly shut down the session)."""
         self._send_command('QUIT')
 
-    def mail(self, sender: Union[str, Address], smtputf8: bool = True) -> None:
+    def mail(self, sender: Union[str, Address], *, smtputf8: bool = True) -> None:
         """
         Send the MAIL FROM command (starts a mail transaction).
 
         :param sender: the sender's email address
         :param smtputf8: send the SMTPUTF8 option, if available on the server
+
         """
         self._require_state(ClientState.ready, ClientState.authenticated)
 
         args = []
         if '8BITMIME' in self._extensions:
             args.append('BODY=8BITMIME')
+
         if smtputf8 and 'SMTPUTF8' in self._extensions:
             self._smtputf8_message = True
             args.append('SMTPUTF8')
