@@ -59,6 +59,7 @@ class SMTPClientProtocol:
     """The (E)SMTP protocol state machine."""
 
     _state: ClientState = field(init=False, default=ClientState.greeting_expected)
+    _smtputf8_message: bool = field(init=False, default=True)
     _out_buffer: bytes = field(init=False, default=b'')
     _in_buffer: bytes = field(init=False, default=b'')
     _response_code: Optional[int] = field(init=False, default=None)
@@ -91,16 +92,23 @@ class SMTPClientProtocol:
         else:
             address_str = address
 
-        if 'SMTPUTF8' in self._extensions:
+        if self._smtputf8_message:
             return address_str.encode('utf-8')
 
         # If SMPTUTF8 is not supported, the address must be ASCII compatible
         try:
             return address_str.encode('ascii')
         except UnicodeEncodeError:
-            raise SMTPProtocolViolation(
-                f'The address {address_str!r} requires UTF-8 encoding but the server does not '
-                f'support the SMTPUTF8 extension')
+            if 'SMTPUTF8' in self._extensions:
+                raise SMTPProtocolViolation(
+                    f'The address {address_str!r} requires UTF-8 encoding but `smtputf8` was not '
+                    'specified in the mail command'
+                )
+            else:
+                raise SMTPProtocolViolation(
+                    f'The address {address_str!r} requires UTF-8 encoding but the server does not '
+                    'support the SMTPUTF8 extension'
+                )
 
     def _send_command(self, command: str, *args: Union[str, bytes]) -> None:
         if self._command_sent is not None:
@@ -297,11 +305,12 @@ class SMTPClientProtocol:
         """Send the QUIT command (required to cleanly shut down the session)."""
         self._send_command('QUIT')
 
-    def mail(self, sender: Union[str, Address]) -> None:
+    def mail(self, sender: Union[str, Address], *, smtputf8: bool = True) -> None:
         """
         Send the MAIL FROM command (starts a mail transaction).
 
         :param sender: the sender's email address
+        :param smtputf8: send the SMTPUTF8 option, if available on the server
 
         """
         self._require_state(ClientState.ready, ClientState.authenticated)
@@ -309,8 +318,12 @@ class SMTPClientProtocol:
         args = []
         if '8BITMIME' in self._extensions:
             args.append('BODY=8BITMIME')
-        if 'SMTPUTF8' in self._extensions:
+
+        if smtputf8 and 'SMTPUTF8' in self._extensions:
+            self._smtputf8_message = True
             args.append('SMTPUTF8')
+        else:
+            self._smtputf8_message = False
 
         self._send_command('MAIL', b'FROM:<' + self._encode_address(sender) + b'>', *args)
 
@@ -346,7 +359,7 @@ class SMTPClientProtocol:
 
         """
         self._require_state(ClientState.send_data)
-        policy: Policy = SMTPUTF8 if 'SMTPUTF8' in self._extensions else SMTP
+        policy: Policy = SMTPUTF8 if self._smtputf8_message else SMTP
         policy = policy.clone(cte_type='7bit') if '8BITMIME' not in self._extensions else policy
         self._out_buffer += message.as_bytes(policy=policy).replace(b'\r\n.', b'\r\n..')
         self._out_buffer += b'.\r\n'
