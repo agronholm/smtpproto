@@ -9,7 +9,8 @@ from ssl import SSLContext
 from typing import Optional, Iterable, Callable, Union, List, Dict, Any
 
 from anyio import (
-    connect_tcp, fail_after, start_blocking_portal, aclose_forcefully, BrokenResourceError)
+    connect_tcp, fail_after, maybe_async_cm, start_blocking_portal, aclose_forcefully,
+    BrokenResourceError)
 from anyio.abc import SocketStream, BlockingPortal, AsyncResource
 from anyio.streams.tls import TLSStream
 
@@ -58,7 +59,7 @@ class AsyncSMTPClient(AsyncResource):
     async def connect(self) -> None:
         """Connect to the SMTP server."""
         if not self._stream:
-            async with fail_after(self.connect_timeout):
+            async with maybe_async_cm(fail_after(self.connect_timeout)):
                 self._stream = await connect_tcp(self.host, self.port)
 
             try:
@@ -111,7 +112,7 @@ class AsyncSMTPClient(AsyncResource):
 
             if self._protocol.needs_incoming_data:
                 try:
-                    async with fail_after(self.timeout):
+                    async with maybe_async_cm(fail_after(self.timeout)):
                         data = await self._stream.receive()
                 except (BrokenResourceError, TimeoutError):
                     await aclose_forcefully(self._stream)
@@ -136,7 +137,7 @@ class AsyncSMTPClient(AsyncResource):
         if data:
             logger.debug('Sent: %s', data)
             try:
-                async with fail_after(self.timeout):
+                async with maybe_async_cm(fail_after(self.timeout)):
                     await self._stream.send(data)
             except (BrokenResourceError, TimeoutError):
                 await aclose_forcefully(self._stream)
@@ -191,44 +192,34 @@ class SyncSMTPClient:
         :func:`anyio.start_blocking_portal`
     """
 
+    _portal: BlockingPortal
+
     def __init__(self, *args, async_backend: str = 'asyncio',
                  async_backend_options: Optional[Dict[str, Any]] = None, **kwargs):
         self._async_backend = async_backend
         self._async_backend_options = async_backend_options
         self._async_client = AsyncSMTPClient(*args, **kwargs)
-        self._portal: Optional[BlockingPortal] = None
 
     def __enter__(self):
+        self._portal_cm = start_blocking_portal(self._async_backend, self._async_backend_options)
+        self._portal = self._portal_cm.__enter__()
         self.connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+        self._portal_cm.__exit__(exc_type, exc_val, exc_tb)
 
     def connect(self) -> None:
         """Connect to the SMTP server."""
-        if not self._portal:
-            self._portal = start_blocking_portal(self._async_backend, self._async_backend_options)
-            try:
-                self._portal.call(self._async_client.connect)
-            except BaseException:
-                self._portal.stop_from_external_thread()
-                raise
+        self._portal.call(self._async_client.connect)
 
     def close(self) -> None:
         """Close the connection, if connected."""
-        if self._portal:
-            try:
-                self._portal.call(self._async_client.aclose)
-            finally:
-                self._portal.stop_from_external_thread()
-                self._portal = None
+        self._portal.call(self._async_client.aclose)
 
     def send_message(self, message: EmailMessage, *,
                      sender: Union[str, Address, None] = None,
                      recipients: Optional[Iterable[str]] = None) -> SMTPResponse:
-        if not self._portal:
-            raise SMTPException('Not connected')
-
         func = partial(self._async_client.send_message, sender=sender, recipients=recipients)
         return self._portal.call(func, message)

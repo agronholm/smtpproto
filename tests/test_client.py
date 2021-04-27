@@ -1,7 +1,10 @@
 import ssl
+import sys
+import threading
 from contextlib import contextmanager, ExitStack
 from email.headerregistry import Address
 from email.message import EmailMessage
+from traceback import print_stack
 from typing import Optional
 
 import pytest
@@ -91,6 +94,12 @@ class TestAsyncClient:
 
 
 class TestSyncClient:
+    @pytest.fixture(autouse=True)
+    def print_threads(self):
+        yield
+        for t in threading.enumerate():
+            print(t)
+
     @pytest.mark.parametrize('use_tls', [False, True], ids=['notls', 'tls'])
     def test_send_mail(self, client_context, server_context, use_tls):
         message = EmailMessage()
@@ -138,3 +147,7 @@ class TestSyncClient:
                 with SyncSMTPClient(host=host, port=port, ssl_context=client_context,
                                     authenticator=authenticator):
                     pass
+
+        for thread_id, frame in sys._current_frames().items():
+            print('Thread', thread_id)
+            print_stack(frame)
