@@ -6,7 +6,9 @@ from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from functools import partial
 from ssl import SSLContext
-from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+from types import TracebackType
+from typing import (Any, Callable, Dict, Iterable, List, Optional, Type,
+                    TypeVar, Union)
 
 from anyio import (BrokenResourceError, aclose_forcefully, connect_tcp,
                    fail_after, maybe_async_cm, start_blocking_portal)
@@ -17,7 +19,9 @@ from .auth import SMTPAuthenticator
 from .protocol import (ClientState, SMTPClientProtocol, SMTPException,
                        SMTPResponse)
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
+T = TypeVar('T', bound='AsyncSMTPClient')
+TSync = TypeVar('TSync', bound='SyncSMTPClient')
 
 
 @dataclass
@@ -49,11 +53,12 @@ class AsyncSMTPClient(AsyncResource):
     _protocol: SMTPClientProtocol = field(init=False, default_factory=SMTPClientProtocol)
     _stream: Union[TLSStream, SocketStream, None] = field(init=False, default=None)
 
-    async def __aenter__(self):
+    async def __aenter__(self: T) -> T:
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: BaseException,
+                        exc_tb: TracebackType) -> None:
         await self.aclose()
 
     async def connect(self) -> None:
@@ -194,19 +199,20 @@ class SyncSMTPClient:
 
     _portal: BlockingPortal
 
-    def __init__(self, *args, async_backend: str = 'asyncio',
-                 async_backend_options: Optional[Dict[str, Any]] = None, **kwargs):
+    def __init__(self, *args: Any, async_backend: str = 'asyncio',
+                 async_backend_options: Optional[Dict[str, Any]] = None, **kwargs: Any):
         self._async_backend = async_backend
         self._async_backend_options = async_backend_options
         self._async_client = AsyncSMTPClient(*args, **kwargs)
 
-    def __enter__(self):
+    def __enter__(self: TSync) -> TSync:
         self._portal_cm = start_blocking_portal(self._async_backend, self._async_backend_options)
         self._portal = self._portal_cm.__enter__()
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: BaseException,
+                 exc_tb: TracebackType) -> None:
         self.close()
         self._portal_cm.__exit__(exc_type, exc_val, exc_tb)
 

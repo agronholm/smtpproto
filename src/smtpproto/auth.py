@@ -86,7 +86,7 @@ class OAuth2Authenticator(SMTPAuthenticator):
     """
 
     def __init__(self, username: str):
-        self.username = username
+        self.username: str = username
 
     @property
     def mechanism(self) -> str:

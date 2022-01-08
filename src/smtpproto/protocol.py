@@ -4,10 +4,10 @@ from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTP, SMTPUTF8, Policy
 from enum import Enum, auto
-from typing import (FrozenSet, Iterable, List, NoReturn, Optional, Sequence,
-                    Tuple, Union)
+from typing import (FrozenSet, Iterable, List, NoReturn, Optional, Pattern,
+                    Sequence, Tuple, Union)
 
-response_re = re.compile('(\\d+)([- ])(.*)$')
+response_re: Pattern[str] = re.compile('(\\d+)([- ])(.*)$')
 
 
 class ClientState(Enum):

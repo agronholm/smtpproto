@@ -19,7 +19,7 @@ repos:
     rev: v2.30.1
     hooks:
       - id: pyupgrade
-        args: [ "--py36-plus", "--keep-mock" ]
+        args: [ "--py37-plus" ]
 
   - repo: https://github.com/pre-commit/mirrors-autopep8
     rev: v1.6.0
@@ -40,13 +40,18 @@ repos:
     rev: v0.931
     hooks:
       - id: mypy
-        additional_dependencies: [ "pytest", "trio-typing", "packaging" ]
+        additional_dependencies: [ "pytest", "packaging" ]
 
-  - repo: https://github.com/necaris/pre-commit-pyright
-    rev: 1.1.53
+  - repo: local
     hooks:
       - id: pyright
-        args: [ "--verifytypes", "anyio" ]
+        name: pyright
+        entry: pyright
+        language: node
+        pass_filenames: false
+        types: [ python ]
+        additional_dependencies: [ 'pyright@1.1.205' ]
+        args: [ "--verifytypes", "smtpproto" ]
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.9.0
