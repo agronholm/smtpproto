@@ -1,5 +1,6 @@
 import logging
 import socket
+import sys
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
@@ -208,7 +209,12 @@ class SyncSMTPClient:
     def __enter__(self: TSync) -> TSync:
         self._portal_cm = start_blocking_portal(self._async_backend, self._async_backend_options)
         self._portal = self._portal_cm.__enter__()
-        self.connect()
+        try:
+            self.connect()
+        except BaseException:
+            self._portal_cm.__exit__(*sys.exc_info())
+            raise
+
         return self
 
     def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: BaseException,
