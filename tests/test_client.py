@@ -1,7 +1,7 @@
 import ssl
 import sys
 import threading
-from contextlib import contextmanager, ExitStack
+from contextlib import ExitStack, contextmanager
 from email.headerregistry import Address
 from email.message import EmailMessage
 from traceback import print_stack

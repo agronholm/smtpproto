@@ -2,9 +2,10 @@ import re
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
-from email.policy import SMTPUTF8, SMTP, Policy
+from email.policy import SMTP, SMTPUTF8, Policy
 from enum import Enum, auto
-from typing import Iterable, Optional, List, Union, Tuple, FrozenSet, Sequence, NoReturn
+from typing import (FrozenSet, Iterable, List, NoReturn, Optional, Sequence,
+                    Tuple, Union)
 
 response_re = re.compile('(\\d+)([- ])(.*)$')
 

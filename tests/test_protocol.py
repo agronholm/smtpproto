@@ -1,12 +1,12 @@
 from email.headerregistry import Address
 from email.message import EmailMessage
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 import pytest
 
-from smtpproto.protocol import (
-    SMTPClientProtocol, ClientState, SMTPProtocolViolation, SMTPMissingExtension,
-    SMTPUnsupportedAuthMechanism)
+from smtpproto.protocol import (ClientState, SMTPClientProtocol,
+                                SMTPMissingExtension, SMTPProtocolViolation,
+                                SMTPUnsupportedAuthMechanism)
 
 
 def call_protocol_method(protocol: SMTPClientProtocol, func: Callable,
@@ -22,6 +22,7 @@ def feed_bytes(protocol: SMTPClientProtocol, data: bytes, expected_code: Optiona
     assert protocol.needs_incoming_data
     response = protocol.feed_bytes(data)
     if expected_code:
+        assert response
         assert response.code == expected_code
         assert not protocol.needs_incoming_data
     else:
@@ -29,6 +30,7 @@ def feed_bytes(protocol: SMTPClientProtocol, data: bytes, expected_code: Optiona
         assert protocol.needs_incoming_data
 
     if expected_message:
+        assert response
         assert response.message == expected_message
     if expected_state:
         assert protocol.state is expected_state
@@ -128,7 +130,7 @@ def test_send_mail_utf8_content(protocol, esmtp, smtputf8, expected_cte, expecte
                          f'Content-Type: text/plain; charset="utf-8"\r\n'
                          f'Content-Transfer-Encoding: {expected_cte}\r\n'
                          f'MIME-Version: 1.0\r\n\r\n'
-                         f'{expected_body}\r\n.\r\n'.encode('utf-8'))
+                         f'{expected_body}\r\n.\r\n'.encode())
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.ready)
 
 
@@ -183,13 +185,13 @@ def test_send_mail_escape_dots(protocol):
     message = EmailMessage()
     message.set_content('The following lines might trip the protocol:\n.test\n.')
     call_protocol_method(protocol, lambda: protocol.data(message),
-                         'Content-Type: text/plain; charset="utf-8"\r\n'
-                         'Content-Transfer-Encoding: 7bit\r\n'
-                         'MIME-Version: 1.0\r\n\r\n'
-                         'The following lines might trip the protocol:\r\n'
-                         '..test\r\n'
-                         '..\r\n'
-                         '.\r\n'.encode('utf-8'))
+                         b'Content-Type: text/plain; charset="utf-8"\r\n'
+                         b'Content-Transfer-Encoding: 7bit\r\n'
+                         b'MIME-Version: 1.0\r\n\r\n'
+                         b'The following lines might trip the protocol:\r\n'
+                         b'..test\r\n'
+                         b'..\r\n'
+                         b'.\r\n')
     feed_bytes(protocol, b'250 OK\r\n', 250, 'OK', ClientState.ready)
 
 

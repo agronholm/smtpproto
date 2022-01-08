@@ -13,4 +13,3 @@ __pycache__
 .idea
 .cache
 .local
-.pre-commit-config.yaml

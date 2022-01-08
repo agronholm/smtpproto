@@ -6,16 +6,16 @@ from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from functools import partial
 from ssl import SSLContext
-from typing import Optional, Iterable, Callable, Union, List, Dict, Any
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
-from anyio import (
-    connect_tcp, fail_after, maybe_async_cm, start_blocking_portal, aclose_forcefully,
-    BrokenResourceError)
-from anyio.abc import SocketStream, BlockingPortal, AsyncResource
+from anyio import (BrokenResourceError, aclose_forcefully, connect_tcp,
+                   fail_after, maybe_async_cm, start_blocking_portal)
+from anyio.abc import AsyncResource, BlockingPortal, SocketStream
 from anyio.streams.tls import TLSStream
 
 from .auth import SMTPAuthenticator
-from .protocol import SMTPClientProtocol, SMTPResponse, ClientState, SMTPException
+from .protocol import (ClientState, SMTPClientProtocol, SMTPException,
+                       SMTPResponse)
 
 logger = logging.getLogger(__name__)
 
