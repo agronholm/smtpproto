@@ -8,6 +8,7 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Dropped support for Python 3.6
 - Added support for Python 3.10
 - Fixed ``SyncClient`` leaving a blocking portal open if the initial connection fails
+- Changed ``SMTPClientProtocol`` to only use ``SMTPUTF8`` if necessary (PR by Cole Maclean)
 
 **1.1.0**
 
