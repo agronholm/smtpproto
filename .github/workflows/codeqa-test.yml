@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -43,15 +43,11 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: |
-        pip install https://github.com/bboe/coveralls-python/archive/bb0e00166b28f49db04d6a8b8cb4bddb5afa529f.zip
-        pip install .[test]
+      run: pip install .[test] coveralls
     - name: Test with pytest
       run: coverage run -m pytest
     - name: Upload coverage data to Coveralls
-      run: |
-        env
-        coveralls
+      run: coveralls --service=github
       env:
         COVERALLS_PARALLEL: true
         COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
