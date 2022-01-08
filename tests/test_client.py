@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import ssl
 from contextlib import ExitStack, closing, contextmanager
 from email.headerregistry import Address
 from email.message import EmailMessage
 from socket import socket
-from typing import List, Optional
 
 import pytest
 from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Sink
-from aiosmtpd.smtp import AuthResult, SMTP
+from aiosmtpd.smtp import SMTP, AuthResult
 
 from smtpproto.auth import PlainAuthenticator
 from smtpproto.client import AsyncSMTPClient, SyncSMTPClient
@@ -30,7 +31,7 @@ class DummyController(Controller):
 
 
 @contextmanager
-def start_server(*, ssl_context: Optional[ssl.SSLContext] = None, factory=SMTP,
+def start_server(*, ssl_context: ssl.SSLContext | None = None, factory=SMTP,
                  handler: type = Sink):
     with closing(socket()) as sock:
         sock.bind(('localhost', 0))
@@ -68,7 +69,7 @@ class TestAsyncClient:
     @pytest.mark.parametrize('success', [True, False], ids=['success', 'failure'])
     async def test_auth_plain(self, client_context, server_context, success):
         class AuthCapableSMTP(SMTP):
-            async def auth_PLAIN(self, _, args: List[str]) -> AuthResult:
+            async def auth_PLAIN(self, _, args: list[str]) -> AuthResult:
                 expected = 'AHVzZXJuYW1lAHBhc3N3b3Jk'
                 if args[1] == expected and success:
                     return AuthResult(success=True)
@@ -114,7 +115,7 @@ class TestSyncClient:
     @pytest.mark.parametrize('success', [True, False], ids=['success', 'failure'])
     def test_auth_plain(self, client_context, server_context, success):
         class AuthCapableSMTP(SMTP):
-            async def auth_PLAIN(self, _, args: List[str]) -> AuthResult:
+            async def auth_PLAIN(self, _, args: list[str]) -> AuthResult:
                 expected = 'AHVzZXJuYW1lAHBhc3N3b3Jk'
                 if args[1] == expected and success:
                     return AuthResult(success=True)

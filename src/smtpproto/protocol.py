@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTP, SMTPUTF8, Policy
 from enum import Enum, auto
-from typing import (FrozenSet, Iterable, List, NoReturn, Optional, Pattern,
-                    Sequence, Tuple, Union)
+from typing import Iterable, NoReturn, Pattern, Sequence
 
 response_re: Pattern[str] = re.compile('(\\d+)([- ])(.*)$')
 
@@ -63,13 +64,13 @@ class SMTPClientProtocol:
     _smtputf8_message: bool = field(init=False, default=True)
     _out_buffer: bytes = field(init=False, default=b'')
     _in_buffer: bytes = field(init=False, default=b'')
-    _response_code: Optional[int] = field(init=False, default=None)
-    _response_lines: List[str] = field(init=False, default_factory=list)
-    _command_sent: Optional[str] = field(init=False, default=None)
-    _args_sent: Optional[Tuple[bytes, ...]] = field(init=False, default=None)
-    _extensions: FrozenSet[str] = field(init=False, default_factory=frozenset)
-    _auth_mechanisms: FrozenSet[str] = field(init=False, default_factory=frozenset)
-    _max_message_size: Optional[int] = field(init=False, default=None)
+    _response_code: int | None = field(init=False, default=None)
+    _response_lines: list[str] = field(init=False, default_factory=list)
+    _command_sent: str | None = field(init=False, default=None)
+    _args_sent: tuple[bytes, ...] | None = field(init=False, default=None)
+    _extensions: frozenset[str] = field(init=False, default_factory=frozenset)
+    _auth_mechanisms: frozenset[str] = field(init=False, default_factory=frozenset)
+    _max_message_size: int | None = field(init=False, default=None)
 
     def _require_state(self, *states: ClientState) -> None:
         if self._state not in states:
@@ -87,7 +88,7 @@ class SMTPClientProtocol:
             raise SMTPUnsupportedAuthMechanism(
                 f'{mechanism} is not a supported authentication mechanism on this server')
 
-    def _encode_address(self, address: Union[str, Address]) -> bytes:
+    def _encode_address(self, address: str | Address) -> bytes:
         if isinstance(address, Address):
             address_str = f'{address.username}@{address.domain}'
         else:
@@ -111,7 +112,7 @@ class SMTPClientProtocol:
                     'support the SMTPUTF8 extension'
                 )
 
-    def _send_command(self, command: str, *args: Union[str, bytes]) -> None:
+    def _send_command(self, command: str, *args: str | bytes) -> None:
         if self._command_sent is not None:
             raise SMTPProtocolViolation('Tried to send a command before the previous one received '
                                         'a response')
@@ -126,7 +127,7 @@ class SMTPClientProtocol:
         self._args_sent = args_encoded
 
     def _parse_extensions(self, lines: Iterable[str]) -> None:
-        auth_mechanisms: List[str] = []
+        auth_mechanisms: list[str] = []
         extensions = []
         for line in lines:
             extension, *params = line.split(' ')
@@ -142,7 +143,7 @@ class SMTPClientProtocol:
         self._extensions = frozenset(extensions)
         self._auth_mechanisms = frozenset(auth_mechanisms)
 
-    def _parse_response(self, code: int, lines: Sequence[str]) -> Optional[SMTPResponse]:
+    def _parse_response(self, code: int, lines: Sequence[str]) -> SMTPResponse | None:
         command, args = self._command_sent, self._args_sent or ()
         self._command_sent = self._args_sent = None
 
@@ -245,21 +246,21 @@ class SMTPClientProtocol:
         return buffer
 
     @property
-    def max_message_size(self) -> Optional[int]:
+    def max_message_size(self) -> int | None:
         """The maximum size of the email message (in bytes) accepted by the server."""
         return self._max_message_size
 
     @property
-    def auth_mechanisms(self) -> FrozenSet[str]:
+    def auth_mechanisms(self) -> frozenset[str]:
         """The set of authentication mechanisms supported on the server."""
         return self._auth_mechanisms
 
     @property
-    def extensions(self) -> FrozenSet[str]:
+    def extensions(self) -> frozenset[str]:
         """The set of extensions advertised by the server."""
         return self._extensions
 
-    def authenticate(self, mechanism: str, secret: Optional[str] = None) -> None:
+    def authenticate(self, mechanism: str, secret: str | None = None) -> None:
         """
         Authenticate to the server using the given mechanism and an accompanying secret.
 
@@ -306,7 +307,7 @@ class SMTPClientProtocol:
         """Send the QUIT command (required to cleanly shut down the session)."""
         self._send_command('QUIT')
 
-    def mail(self, sender: Union[str, Address], *, smtputf8: bool = True) -> None:
+    def mail(self, sender: str | Address, *, smtputf8: bool = True) -> None:
         """
         Send the MAIL FROM command (starts a mail transaction).
 
@@ -328,7 +329,7 @@ class SMTPClientProtocol:
 
         self._send_command('MAIL', b'FROM:<' + self._encode_address(sender) + b'>', *args)
 
-    def recipient(self, recipient: Union[str, Address]) -> None:
+    def recipient(self, recipient: str | Address) -> None:
         """
         Send the RCPT TO command (declare an intended recipient).
 
@@ -377,7 +378,7 @@ class SMTPClientProtocol:
         self._require_extension('STARTTLS')
         self._send_command('STARTTLS')
 
-    def feed_bytes(self, data: bytes) -> Optional[SMTPResponse]:
+    def feed_bytes(self, data: bytes) -> SMTPResponse | None:
         """
         Feed received bytes from the transport into the state machine.
 

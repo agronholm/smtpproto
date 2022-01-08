@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
 from base64 import b64decode, b64encode
 from dataclasses import dataclass

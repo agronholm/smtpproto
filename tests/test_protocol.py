@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from email.headerregistry import Address
 from email.message import EmailMessage
-from typing import Callable, Optional
+from typing import Callable
 
 import pytest
 
-from smtpproto.protocol import (ClientState, SMTPClientProtocol,
-                                SMTPMissingExtension, SMTPProtocolViolation,
-                                SMTPUnsupportedAuthMechanism)
+from smtpproto.protocol import (
+    ClientState, SMTPClientProtocol, SMTPMissingExtension, SMTPProtocolViolation,
+    SMTPUnsupportedAuthMechanism)
 
 
 def call_protocol_method(protocol: SMTPClientProtocol, func: Callable,
@@ -16,9 +18,9 @@ def call_protocol_method(protocol: SMTPClientProtocol, func: Callable,
     assert protocol.get_outgoing_data() == expected_outgoing_data
 
 
-def feed_bytes(protocol: SMTPClientProtocol, data: bytes, expected_code: Optional[int] = None,
-               expected_message: Optional[str] = None,
-               expected_state: Optional[ClientState] = None):
+def feed_bytes(protocol: SMTPClientProtocol, data: bytes, expected_code: int | None = None,
+               expected_message: str | None = None,
+               expected_state: ClientState | None = None):
     assert protocol.needs_incoming_data
     response = protocol.feed_bytes(data)
     if expected_code:

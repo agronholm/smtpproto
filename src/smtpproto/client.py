@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import socket
 import sys
@@ -8,17 +10,16 @@ from email.utils import getaddresses, parseaddr
 from functools import partial
 from ssl import SSLContext
 from types import TracebackType
-from typing import (Any, Callable, Dict, Iterable, List, Optional, Type,
-                    TypeVar, Union)
+from typing import Any, Callable, Iterable, TypeVar
 
-from anyio import (BrokenResourceError, aclose_forcefully, connect_tcp,
-                   fail_after, maybe_async_cm, start_blocking_portal)
+from anyio import (
+    BrokenResourceError, aclose_forcefully, connect_tcp, fail_after, maybe_async_cm,
+    start_blocking_portal)
 from anyio.abc import AsyncResource, BlockingPortal, SocketStream
 from anyio.streams.tls import TLSStream
 
 from .auth import SMTPAuthenticator
-from .protocol import (ClientState, SMTPClientProtocol, SMTPException,
-                       SMTPResponse)
+from .protocol import ClientState, SMTPClientProtocol, SMTPException, SMTPResponse
 
 logger: logging.Logger = logging.getLogger(__name__)
 T = TypeVar('T', bound='AsyncSMTPClient')
@@ -49,16 +50,16 @@ class AsyncSMTPClient(AsyncResource):
     connect_timeout: float = 30
     timeout: float = 60
     domain: str = field(default_factory=socket.gethostname)
-    ssl_context: Optional[SSLContext] = None
-    authenticator: Optional[SMTPAuthenticator] = None
+    ssl_context: SSLContext | None = None
+    authenticator: SMTPAuthenticator | None = None
     _protocol: SMTPClientProtocol = field(init=False, default_factory=SMTPClientProtocol)
-    _stream: Union[TLSStream, SocketStream, None] = field(init=False, default=None)
+    _stream: TLSStream | SocketStream | None = field(init=False, default=None)
 
     async def __aenter__(self: T) -> T:
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: BaseException,
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
                         exc_tb: TracebackType) -> None:
         await self.aclose()
 
@@ -159,16 +160,16 @@ class AsyncSMTPClient(AsyncResource):
         return await self._wait_response()
 
     async def send_message(self, message: EmailMessage, *,
-                           sender: Union[str, Address, None] = None,
-                           recipients: Optional[Iterable[str]] = None) -> SMTPResponse:
+                           sender: str | Address | None = None,
+                           recipients: Iterable[str] | None = None) -> SMTPResponse:
         sender = sender or parseaddr(message.get('From'))[1]
         await self._send_command(self._protocol.mail, sender)
 
         if not recipients:
-            tos: List[str] = message.get_all('to', [])
-            ccs: List[str] = message.get_all('cc', [])
-            resent_tos: List[str] = message.get_all('resent-to', [])
-            resent_ccs: List[str] = message.get_all('resent-cc', [])
+            tos: list[str] = message.get_all('to', [])
+            ccs: list[str] = message.get_all('cc', [])
+            resent_tos: list[str] = message.get_all('resent-to', [])
+            resent_ccs: list[str] = message.get_all('resent-cc', [])
             recipients = [email for name, email in
                           getaddresses(tos + ccs + resent_tos + resent_ccs)]
 
@@ -201,7 +202,7 @@ class SyncSMTPClient:
     _portal: BlockingPortal
 
     def __init__(self, *args: Any, async_backend: str = 'asyncio',
-                 async_backend_options: Optional[Dict[str, Any]] = None, **kwargs: Any):
+                 async_backend_options: dict[str, Any] | None = None, **kwargs: Any):
         self._async_backend = async_backend
         self._async_backend_options = async_backend_options
         self._async_client = AsyncSMTPClient(*args, **kwargs)
@@ -217,7 +218,7 @@ class SyncSMTPClient:
 
         return self
 
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_val: BaseException,
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
                  exc_tb: TracebackType) -> None:
         self.close()
         self._portal_cm.__exit__(exc_type, exc_val, exc_tb)
@@ -231,7 +232,7 @@ class SyncSMTPClient:
         self._portal.call(self._async_client.aclose)
 
     def send_message(self, message: EmailMessage, *,
-                     sender: Union[str, Address, None] = None,
-                     recipients: Optional[Iterable[str]] = None) -> SMTPResponse:
+                     sender: str | Address | None = None,
+                     recipients: Iterable[str] | None = None) -> SMTPResponse:
         func = partial(self._async_client.send_message, sender=sender, recipients=recipients)
         return self._portal.call(func, message)
