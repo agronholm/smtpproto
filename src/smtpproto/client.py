@@ -10,7 +10,8 @@ from email.utils import getaddresses, parseaddr
 from functools import partial
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any, Callable, ContextManager, Iterable, TypeVar
+from warnings import warn
 
 from anyio import (
     BrokenResourceError, aclose_forcefully, connect_tcp, fail_after, maybe_async_cm,
@@ -22,7 +23,7 @@ from .auth import SMTPAuthenticator
 from .protocol import ClientState, SMTPClientProtocol, SMTPException, SMTPResponse
 
 logger: logging.Logger = logging.getLogger(__name__)
-T = TypeVar('T', bound='AsyncSMTPClient')
+TAsync = TypeVar('TAsync', bound='AsyncSMTPClient')
 TSync = TypeVar('TSync', bound='SyncSMTPClient')
 
 
@@ -55,13 +56,17 @@ class AsyncSMTPClient(AsyncResource):
     _protocol: SMTPClientProtocol = field(init=False, default_factory=SMTPClientProtocol)
     _stream: TLSStream | SocketStream | None = field(init=False, default=None)
 
-    async def __aenter__(self: T) -> T:
+    async def __aenter__(self: TAsync) -> TAsync:
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
                         exc_tb: TracebackType) -> None:
         await self.aclose()
+
+    def __del__(self) -> None:
+        if self._stream:
+            warn(f'unclosed {self.__class__.__name__}', ResourceWarning)
 
     async def connect(self) -> None:
         """Connect to the SMTP server."""
@@ -100,6 +105,7 @@ class AsyncSMTPClient(AsyncResource):
                         await auth_gen.aclose()
             except BaseException:
                 await aclose_forcefully(self)
+                self._stream = None
                 raise
 
     async def aclose(self) -> None:
@@ -199,7 +205,8 @@ class SyncSMTPClient:
         :func:`anyio.start_blocking_portal`
     """
 
-    _portal: BlockingPortal
+    _portal_cm: ContextManager[BlockingPortal] | None = None
+    _portal: BlockingPortal | None = None
 
     def __init__(self, *args: Any, async_backend: str = 'asyncio',
                  async_backend_options: dict[str, Any] | None = None, **kwargs: Any):
@@ -208,31 +215,47 @@ class SyncSMTPClient:
         self._async_client = AsyncSMTPClient(*args, **kwargs)
 
     def __enter__(self: TSync) -> TSync:
-        self._portal_cm = start_blocking_portal(self._async_backend, self._async_backend_options)
-        self._portal = self._portal_cm.__enter__()
-        try:
-            self.connect()
-        except BaseException:
-            self._portal_cm.__exit__(*sys.exc_info())
-            raise
-
+        self.connect()
         return self
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
                  exc_tb: TracebackType) -> None:
         self.close()
-        self._portal_cm.__exit__(exc_type, exc_val, exc_tb)
+
+    def __del__(self) -> None:
+        if self._portal:
+            warn(f'unclosed {self.__class__.__name__}', ResourceWarning)
+            self.close()
 
     def connect(self) -> None:
         """Connect to the SMTP server."""
-        self._portal.call(self._async_client.connect)
+        portal_cm = start_blocking_portal(self._async_backend, self._async_backend_options)
+        portal = portal_cm.__enter__()
+        try:
+            portal.call(self._async_client.connect)
+        except BaseException:
+            portal_cm.__exit__(*sys.exc_info())
+            raise
+
+        self._portal_cm = portal_cm
+        self._portal = portal
 
     def close(self) -> None:
         """Close the connection, if connected."""
-        self._portal.call(self._async_client.aclose)
+        if self._portal:
+            try:
+                self._portal.call(self._async_client.aclose)
+            finally:
+                del self._portal
+                if self._portal_cm:
+                    self._portal_cm.__exit__(None, None, None)
+                    del self._portal_cm
 
     def send_message(self, message: EmailMessage, *,
                      sender: str | Address | None = None,
                      recipients: Iterable[str] | None = None) -> SMTPResponse:
+        if not self._portal:
+            raise SMTPException('Not connected')
+
         func = partial(self._async_client.send_message, sender=sender, recipients=recipients)
         return self._portal.call(func, message)
