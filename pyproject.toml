@@ -1,10 +1,49 @@
 [build-system]
 requires = [
-    "setuptools >= 42",
-    "wheel >= 0.29.0",
-    "setuptools_scm[toml] >= 3.4"
+    "setuptools >= 64",
+    "setuptools_scm >= 6.4"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "smtpproto"
+description = "Sans-io SMTP client with an AnyIO based async I/O implementation"
+readme = "README.rst"
+authors = [{name = "Alex Grönholm", email = "alex.gronholm@nextday.fi"}]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Framework :: AnyIO",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+requires-python = ">= 3.7"
+dependencies = [ "anyio >= 3.0" ]
+dynamic = [ "version" ]
+
+[project.urls]
+Documentation = "https://smtpproto.readthedocs.io/en/latest/"
+"Source code" = "https://github.com/agronholm/smtpproto"
+"Issue tracker" = "https://github.com/agronholm/smtpproto/issues"
+
+[project.optional-dependencies]
+test = [
+    "anyio[trio]",
+    "aiosmtpd >= 1.4.2",
+    "pytest >= 6.0",
+    "trustme",
+]
+doc = [
+    "packaging",
+    "sphinx_rtd_theme",
+    "sphinx-autodoc-typehints >= 1.2.0",
+]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
@@ -26,3 +65,23 @@ source = ["smtpproto"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+minversion = 3.3.0
+envlist = lint, py37, py38, py39, py310, pypy3
+skip_missing_interpreters = true
+isolated_build = true
+
+[testenv]
+depends = lint
+commands = pytest {posargs}
+extras = test
+
+[testenv:lint]
+depends =
+deps = pre-commit
+commands = pre-commit run --all-files --show-diff-on-failure
+skip_install = true
+"""
