@@ -22,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
 ]
 requires-python = ">= 3.7"
 dependencies = [ "anyio >= 3.0" ]
@@ -70,7 +71,7 @@ show_missing = true
 legacy_tox_ini = """
 [tox]
 minversion = 3.3.0
-envlist = lint, py37, py38, py39, py310, pypy3
+envlist = lint, py37, py38, py39, py310, py311, pypy3
 skip_missing_interpreters = true
 isolated_build = true
 
