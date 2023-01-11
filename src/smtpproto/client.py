@@ -60,8 +60,12 @@ class AsyncSMTPClient(AsyncResource):
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
-                        exc_tb: TracebackType) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None
+    ) -> None:
         await self.aclose()
 
     def __del__(self) -> None:
@@ -218,8 +222,12 @@ class SyncSMTPClient:
         self.connect()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException,
-                 exc_tb: TracebackType) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None
+    ) -> None:
         self.close()
 
     def __del__(self) -> None:
