@@ -39,9 +39,7 @@ jobs:
         cache: pip
         cache-dependency-path: pyproject.toml
     - name: Install dependencies
-      run: |
-        pip install aiosmtpd@git+https://github.com/maxking/aiosmtpd.git@py311
-        pip install .[test] coveralls
+      run: pip install .[test] coveralls
     - name: Test with pytest
       run: coverage run -m pytest
     - name: Upload coverage data to Coveralls
