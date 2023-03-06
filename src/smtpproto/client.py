@@ -194,8 +194,8 @@ class SyncSMTPClient:
     """
     A synchronous (blocking) SMTP client.
 
-    It is recommended that this client is used as a context manager instead of manually calling
-    :meth:`~connect` and :meth:`close`, if possible.
+    It is recommended that this client is used as a context manager instead of manually
+    calling :meth:`~connect` and :meth:`close`, if possible.
 
     :param host: host name or IP address of the SMTP server
     :param port: port on the SMTP server to connect to
@@ -206,7 +206,7 @@ class SyncSMTPClient:
     :param authenticator: authenticator to use for authenticating with the SMTP server
     :param async_backend: name of the AnyIO-supported asynchronous backend
     :param async_backend_options: dictionary of keyword arguments passed to
-        :func:`anyio.start_blocking_portal`
+        :func:`anyio.from_thread.start_blocking_portal`
     """
 
     _portal_cm: ContextManager[BlockingPortal] | None = None

@@ -22,7 +22,7 @@ v = parse(get_version('smtpproto'))
 version = v.base_version
 release = v.public
 
-language = None
+language = "en"
 
 exclude_patterns = ['_build']
 pygments_style = 'sphinx'
@@ -33,8 +33,7 @@ autodoc_default_options = {
 todo_include_todos = False
 
 html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
 htmlhelp_basename = project + 'doc'
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
-                       'anyio': ('https://anyio.readthedocs.org/en/latest/', None)}
+                       'anyio': ('https://anyio.readthedocs.io/en/stable/', None)}
