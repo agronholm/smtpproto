@@ -69,9 +69,9 @@ class LoginAuthenticator(SMTPAuthenticator):
         for _ in range(2):
             raw_question = yield ''
             question = b64decode(raw_question.encode('ascii')).lower()
-            if question == 'username':
+            if question == 'username:':
                 yield b64encode(self.username.encode('utf-8')).decode('ascii')
-            elif question == 'password':
+            elif question == 'password:':
                 yield b64encode(self.password.encode('utf-8')).decode('ascii')
             else:
                 raise ValueError(f'Unhandled question: {raw_question}')

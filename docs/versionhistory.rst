@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Fixed ``LoginAuthenticator`` expecting the wrong questions (there should be a ``:`` at
+  the end)
+
 **1.2.0**
 
 - Dropped support for Python 3.6
