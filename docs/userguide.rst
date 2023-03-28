@@ -3,13 +3,14 @@ Using the concrete I/O implementations
 
 .. py:currentmodule:: smtpproto.client
 
-In addition to the sans-io protocol implementation, this library also provides both an asynchronous
-and a synchronous SMTP client class (:class:`~AsyncSMTPClient` and :class:`~SyncSMTPClient`,
-respectively).
+In addition to the sans-io protocol implementation, this library also provides both an
+asynchronous and a synchronous SMTP client class (:class:`~AsyncSMTPClient` and
+:class:`~SyncSMTPClient`, respectively).
 
-Most SMTP servers, however, require some form of authentication. While it would be unfeasible to
-provide solutions for every possible situation, the examples below should cover some very common
-cases and should give you a general idea of how to work with SMTP authentication.
+Most SMTP servers, however, require some form of authentication. While it would be
+unfeasible to provide solutions for every possible situation, the examples below should
+cover some very common cases and should give you a general idea of how to work with SMTP
+authentication.
 
 For the OAuth2 examples (further below), you need to install a couple dependencies:
 
@@ -36,7 +37,8 @@ Sending mail via a local SMTP server
         async with AsyncSMTPClient(host='localhost', port=25) as client:
             await client.send_message(message)
 
-    # If your SMTP server requires basic authentication, this is where you enter that info
+    # If your SMTP server requires basic authentication, this is where you enter that
+    # info
     authenticator = PlainAuthenticator(username='myuser', password='mypassword')
 
     # The message you want to send
@@ -53,13 +55,13 @@ Sending mail via a local SMTP server
 Sending mail via Gmail
 ----------------------
 
-The `developer documentation`_ for the G Suite describes how to use the XOAUTH2 mechanism for
-authenticating against the Gmail SMTP server. The following is a practical example of how to extend
-the :class:`~.auth.OAuth2Authenticator` class to obtain an access token and use it
-to send an email via Gmail.
+The `developer documentation`_ for the G Suite describes how to use the XOAUTH2
+mechanism for authenticating against the Gmail SMTP server. The following is a practical
+example of how to extend the :class:`~.auth.OAuth2Authenticator` class to obtain an
+access token and use it to send an email via Gmail.
 
-The following example assumes the presence of an existing `G Suite service account`_ authorized to
-send email via SMTP (using the ``https://mail.google.com/`` scope).
+The following example assumes the presence of an existing `G Suite service account`_
+authorized to send email via SMTP (using the ``https://mail.google.com/`` scope).
 
 .. code-block:: python3
 
@@ -90,17 +92,25 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
                 'sub': self.username
             }, self.private_key, algorithm='RS256')
 
-            data = {'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                    'assertion': webtoken.decode('ascii')}
-            async with aiohttp.request('POST', 'https://oauth2.googleapis.com/token', data=data,
-                                       raise_for_status=True) as response:
+            data = {
+                'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion': webtoken.decode('ascii')
+            }
+            async with aiohttp.request(
+                'POST',
+                'https://oauth2.googleapis.com/token',
+                data=data,
+                raise_for_status=True
+            ) as response:
                 json_body = await response.json()
 
             return json_body['access_token'], json_body["expires_in"]
 
 
     async def main():
-        async with AsyncSMTPClient(host='smtp.gmail.com', authenticator=authenticator) as client:
+        async with AsyncSMTPClient(
+            host='smtp.gmail.com', authenticator=authenticator
+        ) as client:
             await client.send_message(message)
 
     # Your gmail user name
@@ -109,7 +119,9 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
     # Service account ID and private key – these have to be obtained from Gmail
     client_id = 'yourserviceaccount@yourdomain.iam.gserviceaccount.com'
     private_key = '-----BEGIN PRIVATE KEY-----\n...-----END PRIVATE KEY-----\n'
-    authenticator = GMailAuthenticator(username=me, client_id=client_id, private_key=private_key)
+    authenticator = GMailAuthenticator(
+        username=me, client_id=client_id, private_key=private_key
+    )
 
     # The message you want to send
     message = EmailMessage()
@@ -128,20 +140,22 @@ send email via SMTP (using the ``https://mail.google.com/`` scope).
 Sending mail via Office 365
 ---------------------------
 
-.. warning:: It is currently not clear what actual permissions the service account requires.
-    As such, this example *should* work but has never been successfully tested.
+.. warning:: It is currently not clear what actual permissions the service account
+    requires. As such, this example *should* work but has never been successfully
+    tested.
 
-The following example assumes the presence of a registered `Azure application`_ authorized to
-send email via SMTP (using the ``SMTP.Send`` scope). It uses the `device code flow`_
-to obtain an access token.
+The following example assumes the presence of a registered `Azure application`_
+authorized to send email via SMTP (using the ``SMTP.Send`` scope). It uses the
+`device code flow`_ to obtain an access token.
 
-In order for the device code flow to work for the registered application, the following settings
-must be in place:
+In order for the device code flow to work for the registered application, the following
+settings must be in place:
 
 * The redirect URI for the application must be
   ``https://login.microsoftonline.com/common/oauth2/nativeclient``
 * The ``Treat application as a public client`` option must be enabled
-* The ``SMTP.Send`` permission from ``Microsoft Graph`` must be added in the configured permissions
+* The ``SMTP.Send`` permission from ``Microsoft Graph`` must be added in the configured
+  permissions
 
 In addition, your Azure AD must not have `Security defaults`_ enabled.
 
@@ -157,7 +171,9 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
 
 
     class AzureAuthenticator(OAuth2Authenticator):
-        def __init__(self, username: str, tenant_id, client_id: str, client_secret: str):
+        def __init__(
+            self, username: str, tenant_id, client_id: str, client_secret: str
+        ):
             super().__init__(username)
             self.tenant_id = tenant_id
             self.client_id = client_id
@@ -169,27 +185,36 @@ In addition, your Azure AD must not have `Security defaults`_ enabled.
                     'client_secret': self.client_secret,
                     'grant_type': 'client_credentials'}
             async with aiohttp.request(
-                    'POST', f'https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token',
-                    data=data, raise_for_status=True) as response:
+                'POST',
+                f'https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token',
+                data=data,
+                raise_for_status=True
+            ) as response:
                 json_body = await response.json()
 
             return json_body['access_token'], json_body["expires_in"]
 
 
     async def main():
-        async with AsyncSMTPClient(host='smtp.office365.com',
-                                   authenticator=authenticator) as client:
+        async with AsyncSMTPClient(
+            host='smtp.office365.com', authenticator=authenticator
+        ) as client:
             await client.send_message(message)
 
     # Your Office 365 username/email address
     me = 'my.name@office365.com'
 
-    # Application (client) ID and secret – these have to be obtained from the Azure portal
+    # Application (client) ID and secret – these have to be obtained from the Azure
+    # portal
     tenant_id = '11111111-1111-1111-1111-111111111111'
     client_id = '11111111-1111-1111-1111-111111111111'
     client_secret = '...'
-    authenticator = AzureAuthenticator(username=me, tenant_id=tenant_id, client_id=client_id,
-                                       client_secret=client_secret)
+    authenticator = AzureAuthenticator(
+        username=me,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret
+    )
 
     # The message you want to send
     message = EmailMessage()
