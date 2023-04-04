@@ -78,7 +78,9 @@ class AsyncSMTPClient(AsyncResource):
 
     def __del__(self) -> None:
         if self._stream:
-            warn(f"unclosed {self.__class__.__name__}", ResourceWarning)
+            warn(
+                f"unclosed {self.__class__.__name__}", ResourceWarning, 1, self._stream
+            )
 
     async def connect(self) -> None:
         """Connect to the SMTP server."""
@@ -257,7 +259,9 @@ class SyncSMTPClient:
 
     def __del__(self) -> None:
         if self._portal:
-            warn(f"unclosed {self.__class__.__name__}", ResourceWarning)
+            warn(
+                f"unclosed {self.__class__.__name__}", ResourceWarning, 1, self._portal
+            )
             self.close()
 
     def connect(self) -> None:
