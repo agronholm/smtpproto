@@ -79,7 +79,10 @@ class AsyncSMTPClient(AsyncResource):
     def __del__(self) -> None:
         if self._stream:
             warn(
-                f"unclosed {self.__class__.__name__}", ResourceWarning, 1, self._stream
+                f"unclosed {self.__class__.__name__}",
+                ResourceWarning,
+                stacklevel=1,
+                source=self._stream,
             )
 
     async def connect(self) -> None:
@@ -260,7 +263,10 @@ class SyncSMTPClient:
     def __del__(self) -> None:
         if self._portal:
             warn(
-                f"unclosed {self.__class__.__name__}", ResourceWarning, 1, self._portal
+                f"unclosed {self.__class__.__name__}",
+                ResourceWarning,
+                stacklevel=1,
+                source=self._portal,
             )
             self.close()
 
