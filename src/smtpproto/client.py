@@ -19,10 +19,9 @@ from anyio import (
     aclose_forcefully,
     connect_tcp,
     fail_after,
-    maybe_async_cm,
-    start_blocking_portal,
 )
 from anyio.abc import AsyncResource, BlockingPortal, SocketStream
+from anyio.from_thread import start_blocking_portal
 from anyio.streams.tls import TLSStream
 
 from .auth import SMTPAuthenticator
@@ -88,7 +87,7 @@ class AsyncSMTPClient(AsyncResource):
     async def connect(self) -> None:
         """Connect to the SMTP server."""
         if not self._stream:
-            async with maybe_async_cm(fail_after(self.connect_timeout)):
+            with fail_after(self.connect_timeout):
                 self._stream = await connect_tcp(self.host, self.port)
 
             try:
@@ -148,7 +147,7 @@ class AsyncSMTPClient(AsyncResource):
 
             if self._protocol.needs_incoming_data:
                 try:
-                    async with maybe_async_cm(fail_after(self.timeout)):
+                    with fail_after(self.timeout):
                         data = await self._stream.receive()
                 except (BrokenResourceError, TimeoutError):
                     await aclose_forcefully(self._stream)
@@ -173,7 +172,7 @@ class AsyncSMTPClient(AsyncResource):
         if data:
             logger.debug("Sent: %s", data)
             try:
-                async with maybe_async_cm(fail_after(self.timeout)):
+                with fail_after(self.timeout):
                     await self._stream.send(data)
             except (BrokenResourceError, TimeoutError):
                 await aclose_forcefully(self._stream)
