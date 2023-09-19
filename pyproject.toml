@@ -52,8 +52,6 @@ version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
 [tool.ruff]
-line-length = 88
-target-version = "py37"
 select = [
     "E", "F", "W",  # default flake-8
     "I",            # isort
@@ -61,9 +59,6 @@ select = [
     "UP",           # pyupgrade
     "B0",           # flake8-bugbear
 ]
-
-[tool.mypy]
-python_version = "3.7"
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"
