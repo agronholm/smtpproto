@@ -38,6 +38,7 @@ Documentation = "https://smtpproto.readthedocs.io/en/latest/"
 test = [
     "anyio[trio] >= 3.0",
     "aiosmtpd >= 1.4.4",
+    "coverage >= 7",
     "pytest >= 6.0",
     "trustme",
 ]
