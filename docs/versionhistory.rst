@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**1.2.1**
 
 - Fixed ``LoginAuthenticator`` expecting the wrong questions (there should be a ``:`` at
   the end)
