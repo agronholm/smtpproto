@@ -52,13 +52,16 @@ doc = [
 version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
-[tool.ruff]
-select = [
-    "E", "F", "W",  # default flake-8
-    "I",            # isort
-    "PGH",          # pygrep-hooks
-    "UP",           # pyupgrade
+[tool.ruff.lint]
+extend-select = [
     "B0",           # flake8-bugbear
+    "G",            # flake8-logging-format
+    "I",            # isort
+    "ISC",          # flake8-implicit-str-concat
+    "PGH",          # pygrep-hooks
+    "RUF100",       # unused noqa (yesqa)
+    "UP",           # pyupgrade
+    "W",            # pycodestyle warnings
 ]
 
 [tool.pytest.ini_options]

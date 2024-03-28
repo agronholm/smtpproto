@@ -129,7 +129,7 @@ class SMTPClientProtocol:
     def _send_command(self, command: str, *args: str | bytes) -> None:
         if self._command_sent is not None:
             raise SMTPProtocolViolation(
-                "Tried to send a command before the previous one received " "a response"
+                "Tried to send a command before the previous one received a response"
             )
 
         line = command.encode("ascii")
