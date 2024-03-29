@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
+from copy import copy
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
@@ -95,7 +96,7 @@ class SMTPClientProtocol:
                 f"the server does not support it"
             )
 
-    def _require_auth_mechanism(self, mechanism) -> None:
+    def _require_auth_mechanism(self, mechanism: str) -> None:
         if mechanism not in self._auth_mechanisms:
             raise SMTPUnsupportedAuthMechanism(
                 f"{mechanism} is not a supported authentication mechanism on this "
@@ -390,6 +391,12 @@ class SMTPClientProtocol:
             if "8BITMIME" not in self._extensions
             else policy
         )
+
+        if "bcc" in message or "resent-bcc" in message:
+            message = copy(message)
+            del message["bcc"]
+            del message["resent-bcc"]
+
         self._out_buffer += message.as_bytes(policy=policy).replace(b"\r\n.", b"\r\n..")
         self._out_buffer += b".\r\n"
         self._state = ClientState.data_sent

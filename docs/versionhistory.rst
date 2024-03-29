@@ -3,6 +3,22 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- **BACKWARDS INCOMPATIBLE** The ``OAuth2Authenticator`` class was refactored:
+
+  * The return type of ``get_token()`` was changed to a (decoded) JSON web token –
+    a dict containing the ``access_token`` and ``expires_in`` fields
+  * The result of ``get_token()`` method is now automatically cached until the token's
+    expiration time nears (configurable via the ``grace_period`` parameter in
+    ``OAuth2Authenticator``)
+  * Added the ``clear_cached_token()`` method
+- Dropped support for Python 3.7
+- The ``Bcc`` and ``Resent-Bcc`` are now properly added to the recipients list by the
+  concrete client implementation
+- The ``Bcc`` and ``Resent-Bcc`` headers are now automatically left out of the data in
+  ``SMTPClientProtocol.data()`` to simplify client implementations
+
 **1.2.1**
 
 - Fixed ``LoginAuthenticator`` expecting the wrong questions (there should be a ``:`` at

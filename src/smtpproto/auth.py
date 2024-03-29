@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import time
 from abc import ABCMeta, abstractmethod
 from base64 import b64decode, b64encode
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import TypedDict
 
 
 class SMTPAuthenticator(metaclass=ABCMeta):
@@ -80,6 +82,11 @@ class LoginAuthenticator(SMTPAuthenticator):
                 raise ValueError(f"Unhandled question: {raw_question}")
 
 
+class JSONWebToken(TypedDict):
+    access_token: str
+    expires_in: float
+
+
 class OAuth2Authenticator(SMTPAuthenticator):
     """
     Authenticates against the server using OAUTH2.
@@ -88,27 +95,53 @@ class OAuth2Authenticator(SMTPAuthenticator):
     :meth:`get_token` method.
 
     :param username: the user name to authenticate as
+    :param grace_period: number of seconds prior to token expiration to get a new one
     """
 
-    def __init__(self, username: str):
+    _stored_token: str | None = None
+    _expires_at: float | None = None
+
+    def __init__(self, username: str, *, grace_period: float = 600):
         self.username: str = username
+        self.grace_period = grace_period
 
     @property
     def mechanism(self) -> str:
         return "XOAUTH2"
 
     async def authenticate(self) -> AsyncGenerator[str, str]:
-        token = await self.get_token()
+        # Don't request a new token unless it has expired or is close to expiring
+        if (
+            self._stored_token
+            and self._expires_at
+            and time.monotonic() - self._expires_at
+        ):
+            token = self._stored_token
+        else:
+            jwt = await self.get_token()
+            self._stored_token = token = jwt["access_token"]
+            self._expires_at = time.monotonic() + jwt["expires_in"] - self.grace_period
+
         auth_string = f"user={self.username}\x01auth=Bearer {token}\x01\x01"
         yield b64encode(auth_string.encode("utf-8")).decode("ascii")
 
     @abstractmethod
-    async def get_token(self) -> str:
+    async def get_token(self) -> JSONWebToken:
         """
         Obtain a new access token.
 
-        Implementors should cache the token and its expiration time and only obtain a
-        new one if the old one has expired or is about to.
+        This method will be called only when there either is no cached token, or the
+        cached token is expired or nearing expiration. You can also use
+        :meth:`clear_cached_token` to manually erase the cached token. The
+        ``expires_in`` field in the returned dict is the number of seconds after which
+        the token will expire.
 
-        :return: the access token
+        .. note:: If the backing server does not provide a value for ``expires_in``,
+            the implementor must fill in the value by other means.
+
+        :return: a dict containing the ``access_token`` and ``expires_in`` fields
         """
+
+    def clear_cached_token(self) -> None:
+        """Clear the previously stored token, if any."""
+        self._stored_token = self._expires_at = None

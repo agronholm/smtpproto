@@ -26,7 +26,11 @@ repos:
     rev: v1.9.0
     hooks:
       - id: mypy
-        additional_dependencies: [ "pytest", "packaging" ]
+        additional_dependencies:
+          - aiosmtpd
+          - anyio
+          - pytest
+          - trustme
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0

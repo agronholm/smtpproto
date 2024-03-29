@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from email.headerregistry import Address
 from email.message import EmailMessage
+from typing import Any, cast
 
 import pytest
+from _pytest.fixtures import SubRequest
 from smtpproto.protocol import (
     ClientState,
     SMTPClientProtocol,
@@ -15,8 +17,8 @@ from smtpproto.protocol import (
 
 
 def call_protocol_method(
-    protocol: SMTPClientProtocol, func: Callable, expected_outgoing_data: bytes
-):
+    protocol: SMTPClientProtocol, func: Callable[[], Any], expected_outgoing_data: bytes
+) -> None:
     assert not protocol.needs_incoming_data
     func()
     assert protocol.get_outgoing_data() == expected_outgoing_data
@@ -28,7 +30,7 @@ def feed_bytes(
     expected_code: int | None = None,
     expected_message: str | None = None,
     expected_state: ClientState | None = None,
-):
+) -> None:
     assert protocol.needs_incoming_data
     response = protocol.feed_bytes(data)
     if expected_code:
@@ -46,7 +48,7 @@ def feed_bytes(
         assert protocol.state is expected_state
 
 
-def exchange_greetings(protocol, esmtp=True):
+def exchange_greetings(protocol: SMTPClientProtocol, esmtp: bool = True) -> None:
     # Server sends a greeting message
     feed_bytes(
         protocol,
@@ -95,7 +97,7 @@ def exchange_greetings(protocol, esmtp=True):
         assert protocol.max_message_size is None
 
 
-def start_mail_tx(protocol, smtputf8=True):
+def start_mail_tx(protocol: SMTPClientProtocol, smtputf8: bool = True) -> None:
     # Start a mail transaction
     extra_args = b""
     if "8BITMIME" in protocol.extensions:
@@ -139,15 +141,17 @@ def start_mail_tx(protocol, smtputf8=True):
 
 
 @pytest.fixture(
-    params=["héllö@example.org", Address("Héllö World", "héllö", "example.org")],
-    ids=["str", "object"],
+    params=[
+        pytest.param("héllö@example.org", id="str"),
+        pytest.param(Address("Héllö World", "héllö", "example.org"), id="object"),
+    ],
 )
-def unicode_address(request):
-    return request.param
+def unicode_address(request: SubRequest) -> str | Address:
+    return cast("str | Address", request.param)
 
 
 @pytest.fixture
-def protocol():
+def protocol() -> SMTPClientProtocol:
     proto = SMTPClientProtocol()
     assert proto.state is ClientState.greeting_expected
     assert proto.needs_incoming_data
@@ -184,8 +188,13 @@ def protocol():
     ],
 )
 def test_send_mail_utf8_content(
-    protocol, esmtp, smtputf8, expected_cte, expected_subject, expected_body
-):
+    protocol: SMTPClientProtocol,
+    esmtp: bool,
+    smtputf8: bool,
+    expected_cte: str,
+    expected_subject: str,
+    expected_body: str,
+) -> None:
     exchange_greetings(protocol, esmtp=esmtp)
     start_mail_tx(protocol, smtputf8=smtputf8)
 
@@ -204,7 +213,9 @@ def test_send_mail_utf8_content(
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.ready)
 
 
-def test_send_mail_utf8_addresses(protocol, unicode_address):
+def test_send_mail_utf8_addresses(
+    protocol: SMTPClientProtocol, unicode_address: str | Address
+) -> None:
     exchange_greetings(protocol)
     protocol.mail(unicode_address)
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.mailtx)
@@ -212,7 +223,9 @@ def test_send_mail_utf8_addresses(protocol, unicode_address):
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.recipient_sent)
 
 
-def test_send_mail_unicode_sender_encoding_error(protocol, unicode_address):
+def test_send_mail_unicode_sender_encoding_error(
+    protocol: SMTPClientProtocol, unicode_address: str | Address
+) -> None:
     exchange_greetings(protocol, esmtp=False)
     exc = pytest.raises(SMTPProtocolViolation, protocol.mail, unicode_address)
     exc.match(
@@ -221,7 +234,9 @@ def test_send_mail_unicode_sender_encoding_error(protocol, unicode_address):
     )
 
 
-def test_send_mail_unicode_sender_no_smtputf8_encoding_error(protocol, unicode_address):
+def test_send_mail_unicode_sender_no_smtputf8_encoding_error(
+    protocol: SMTPClientProtocol, unicode_address: str | Address
+) -> None:
     exchange_greetings(protocol, esmtp=True)
     exc = pytest.raises(
         SMTPProtocolViolation, protocol.mail, unicode_address, smtputf8=False
@@ -232,7 +247,9 @@ def test_send_mail_unicode_sender_no_smtputf8_encoding_error(protocol, unicode_a
     )
 
 
-def test_send_mail_unicode_recipient_encoding_error(protocol, unicode_address):
+def test_send_mail_unicode_recipient_encoding_error(
+    protocol: SMTPClientProtocol, unicode_address: str | Address
+) -> None:
     exchange_greetings(protocol, esmtp=False)
     protocol.mail("hello@example.org")
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.mailtx)
@@ -242,8 +259,8 @@ def test_send_mail_unicode_recipient_encoding_error(protocol, unicode_address):
 
 
 def test_send_mail_unicode_recipient_no_smtputf8_encoding_error(
-    protocol, unicode_address
-):
+    protocol: SMTPClientProtocol, unicode_address: str | Address
+) -> None:
     exchange_greetings(protocol, esmtp=True)
     protocol.mail("hello@example.org", smtputf8=False)
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.mailtx)
@@ -252,7 +269,7 @@ def test_send_mail_unicode_recipient_no_smtputf8_encoding_error(
     exc.match("^The address 'héllö@example.org' requires UTF-8")
 
 
-def test_send_mail_escape_dots(protocol):
+def test_send_mail_escape_dots(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     start_mail_tx(protocol)
 
@@ -272,31 +289,31 @@ def test_send_mail_escape_dots(protocol):
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.ready)
 
 
-def test_reset_mail_tx(protocol):
+def test_reset_mail_tx(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     start_mail_tx(protocol)
     call_protocol_method(protocol, protocol.reset, b"RSET\r\n")
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.ready)
 
 
-def test_bad_greeting(protocol):
+def test_bad_greeting(protocol: SMTPClientProtocol) -> None:
     feed_bytes(protocol, b"554 Go away\r\n", 554, "Go away")
 
 
-def test_premature_greeting(protocol):
+def test_premature_greeting(protocol: SMTPClientProtocol) -> None:
     pytest.raises(SMTPProtocolViolation, protocol.send_greeting, "foo.bar").match(
         "Required state: one of: greeting_received; current state: greeting_expected"
     )
 
 
-def test_double_command(protocol):
+def test_double_command(protocol: SMTPClientProtocol) -> None:
     protocol.noop()
     pytest.raises(SMTPProtocolViolation, protocol.noop).match(
         "Tried to send a command before the previous one received a response"
     )
 
 
-def test_authentication_required(protocol):
+def test_authentication_required(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     call_protocol_method(
         protocol,
@@ -308,19 +325,19 @@ def test_authentication_required(protocol):
     )
 
 
-def test_noop(protocol):
+def test_noop(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     call_protocol_method(protocol, protocol.noop, b"NOOP\r\n")
     feed_bytes(protocol, b"250 OK\r\n", 250, "OK", ClientState.ready)
 
 
-def test_start_tls(protocol):
+def test_start_tls(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     call_protocol_method(protocol, protocol.start_tls, b"STARTTLS\r\n")
     feed_bytes(protocol, b"220 OK\r\n", 220, "OK", ClientState.greeting_received)
 
 
-def test_start_tls_missing_extension(protocol):
+def test_start_tls_missing_extension(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol, esmtp=False)
     pytest.raises(SMTPMissingExtension, protocol.start_tls).match(
         "This operation requires the STARTTLS extension but the server does not "
@@ -328,20 +345,20 @@ def test_start_tls_missing_extension(protocol):
     )
 
 
-def test_quit(protocol):
+def test_quit(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     call_protocol_method(protocol, protocol.quit, b"QUIT\r\n")
     feed_bytes(protocol, b"221 OK\r\n", 221, "OK", ClientState.finished)
 
 
-def test_auth_with_unsupported_mechanism(protocol):
+def test_auth_with_unsupported_mechanism(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
     pytest.raises(
         SMTPUnsupportedAuthMechanism, lambda: protocol.authenticate("XOAUTH2")
     ).match("XOAUTH2 is not a supported authentication mechanism on this server")
 
 
-def test_auth_plain(protocol):
+def test_auth_plain(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
 
     call_protocol_method(
@@ -359,7 +376,7 @@ def test_auth_plain(protocol):
 
 
 @pytest.mark.parametrize("error_code", [432, 454, 500, 534, 535, 538])
-def test_auth_plain_failure(protocol, error_code):
+def test_auth_plain_failure(protocol: SMTPClientProtocol, error_code: int) -> None:
     exchange_greetings(protocol)
     call_protocol_method(
         protocol,
@@ -375,7 +392,7 @@ def test_auth_plain_failure(protocol, error_code):
     )
 
 
-def test_auth_login(protocol):
+def test_auth_login(protocol: SMTPClientProtocol) -> None:
     exchange_greetings(protocol)
 
     call_protocol_method(
@@ -411,7 +428,7 @@ def test_auth_login(protocol):
 
 
 @pytest.mark.parametrize("error_code", [432, 454, 500, 534, 535, 538])
-def test_auth_login_failure(protocol, error_code):
+def test_auth_login_failure(protocol: SMTPClientProtocol, error_code: int) -> None:
     exchange_greetings(protocol)
 
     call_protocol_method(
@@ -446,24 +463,24 @@ def test_auth_login_failure(protocol, error_code):
     )
 
 
-def test_server_invalid_input(protocol):
+def test_server_invalid_input(protocol: SMTPClientProtocol) -> None:
     exc = pytest.raises(SMTPProtocolViolation, feed_bytes, protocol, b"BLAH foobar\r\n")
     exc.match("Invalid input: BLAH foobar")
 
 
-def test_server_invalid_continuation(protocol):
+def test_server_invalid_continuation(protocol: SMTPClientProtocol) -> None:
     feed_bytes(protocol, b"220-hello\r\n")
     exc = pytest.raises(SMTPProtocolViolation, feed_bytes, protocol, b"230 hello\r\n")
     exc.match("Expected code 220, got 230 instead")
 
 
-def test_server_invalid_status_code(protocol):
+def test_server_invalid_status_code(protocol: SMTPClientProtocol) -> None:
     exc = pytest.raises(SMTPProtocolViolation, feed_bytes, protocol, b"600 hello\r\n")
     exc.match("Unexpected response: 600 hello")
 
 
 @pytest.mark.parametrize("error_code", [504, 550])
-def test_ehlo_error(protocol, error_code):
+def test_ehlo_error(protocol: SMTPClientProtocol, error_code: int) -> None:
     feed_bytes(
         protocol,
         b"220 foo.bar SMTP service ready\r\n",
@@ -478,7 +495,7 @@ def test_ehlo_error(protocol, error_code):
 
 
 @pytest.mark.parametrize("error_code", [502, 504, 550])
-def test_helo_error(protocol, error_code):
+def test_helo_error(protocol: SMTPClientProtocol, error_code: int) -> None:
     feed_bytes(
         protocol,
         b"220 foo.bar SMTP service ready\r\n",
@@ -495,7 +512,7 @@ def test_helo_error(protocol, error_code):
 
 
 @pytest.mark.parametrize("error_code", [451, 452, 455, 503, 550, 553, 552, 555])
-def test_mail_error(protocol, error_code):
+def test_mail_error(protocol: SMTPClientProtocol, error_code: int) -> None:
     exchange_greetings(protocol)
     call_protocol_method(
         protocol,
@@ -508,7 +525,7 @@ def test_mail_error(protocol, error_code):
 @pytest.mark.parametrize(
     "error_code", [450, 451, 452, 455, 503, 550, 551, 552, 553, 555]
 )
-def test_rcpt_error(protocol, error_code):
+def test_rcpt_error(protocol: SMTPClientProtocol, error_code: int) -> None:
     exchange_greetings(protocol)
     call_protocol_method(
         protocol,
@@ -523,7 +540,7 @@ def test_rcpt_error(protocol, error_code):
 
 
 @pytest.mark.parametrize("error_code", [450, 451, 452, 503, 550, 552, 554])
-def test_start_data_error(protocol, error_code):
+def test_start_data_error(protocol: SMTPClientProtocol, error_code: int) -> None:
     exchange_greetings(protocol)
     call_protocol_method(
         protocol,

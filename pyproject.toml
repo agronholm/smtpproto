@@ -15,17 +15,17 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Typing :: Typed",
     "Framework :: AnyIO",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">= 3.7"
+requires-python = ">= 3.8"
 dependencies = [ "anyio >= 3.0" ]
 dynamic = [ "version" ]
 
@@ -64,6 +64,11 @@ extend-select = [
     "W",            # pycodestyle warnings
 ]
 
+[tool.mypy]
+python_version = "3.8"
+strict = true
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"
 testpaths = "tests"
@@ -78,7 +83,7 @@ show_missing = true
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = lint, py37, py38, py39, py310, py311, py312, pypy3
+envlist = lint, py38, py39, py310, py311, py312, pypy3
 skip_missing_interpreters = true
 minversion = 4.0
 

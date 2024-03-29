@@ -179,7 +179,9 @@ class AsyncSMTPClient(AsyncResource):
                 self._stream = None
                 raise
 
-    async def _send_command(self, command: Callable, *args) -> SMTPResponse:
+    async def _send_command(
+        self, command: Callable[..., None], *args: Any
+    ) -> SMTPResponse:
         if not self._stream:
             raise SMTPException("Not connected")
 
@@ -200,11 +202,15 @@ class AsyncSMTPClient(AsyncResource):
         if not recipients:
             tos: list[str] = message.get_all("to", [])
             ccs: list[str] = message.get_all("cc", [])
+            bccs: list[str] = message.get_all("bcc", [])
             resent_tos: list[str] = message.get_all("resent-to", [])
             resent_ccs: list[str] = message.get_all("resent-cc", [])
+            resent_bccs: list[str] = message.get_all("resent-bcc", [])
             recipients = [
                 email
-                for name, email in getaddresses(tos + ccs + resent_tos + resent_ccs)
+                for name, email in getaddresses(
+                    tos + ccs + bccs + resent_tos + resent_ccs + resent_bccs
+                )
             ]
 
         for recipient in recipients:
