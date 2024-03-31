@@ -44,37 +44,3 @@ authorized to send email via SMTP (using the ``https://mail.google.com/`` scope)
 
 .. _developer documentation: https://developers.google.com/gmail/imap/xoauth2-protocol
 .. _G Suite service account: https://support.google.com/a/answer/7378726?hl=en
-
-
-Sending mail via Office 365
----------------------------
-
-.. warning:: It is currently not clear what actual permissions the service account
-    requires. As such, this example *should* work but has never been successfully
-    tested.
-
-The following example assumes the presence of a registered `Entra ID application`_
-authorized to send email via SMTP (using the ``SMTP.Send`` scope). It uses the
-`device code flow`_ to obtain an access token.
-
-In order for the device code flow to work for the registered application, the following
-settings must be in place:
-
-* The redirect URI for the application must be
-  ``https://login.microsoftonline.com/common/oauth2/nativeclient``
-* The ``Treat application as a public client`` option must be enabled
-* The ``SMTP.Send`` permission from ``Microsoft Graph`` must be added in the configured
-  permissions
-
-In addition, your Entra ID must not have `Security defaults`_ enabled.
-
-.. literalinclude:: ../examples/office365.py
-   :language: python
-
-.. _Entra ID application: https://docs.microsoft.com/en-us/exchange/client-developer/\
-    legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth\
-    #register-your-application
-.. _device code flow: https://docs.microsoft.com/en-us/azure/active-directory/develop/\
-    v2-oauth2-device-code
-.. _Security defaults: https://docs.microsoft.com/fi-fi/azure/active-directory/\
-    fundamentals/concept-fundamentals-security-defaults
