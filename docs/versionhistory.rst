@@ -21,6 +21,7 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
     ``OAuth2Authenticator``)
   * Added the ``clear_cached_token()`` method
 - Dropped support for Python 3.7
+- Upgraded minimum AnyIO version to 4.2+
 - The ``Bcc`` and ``Resent-Bcc`` are now properly added to the recipients list by the
   concrete client implementation
 - The ``Bcc`` and ``Resent-Bcc`` headers are now automatically left out of the data in
