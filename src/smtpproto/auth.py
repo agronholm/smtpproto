@@ -83,8 +83,14 @@ class LoginAuthenticator(SMTPAuthenticator):
 
 
 class JSONWebToken(TypedDict):
+    """
+    :ivar str access_token: the access token
+    :ivar int expires_in: seconds after which the access token expires
+
+    """
+
     access_token: str
-    expires_in: float
+    expires_in: int
 
 
 class OAuth2Authenticator(SMTPAuthenticator):

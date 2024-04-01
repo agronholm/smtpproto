@@ -6,10 +6,8 @@ from smtpproto.client import AsyncSMTPClient
 
 
 async def main() -> None:
-    async with AsyncSMTPClient(
-        host="localhost", port=25, authenticator=authenticator
-    ) as client:
-        await client.send_message(message)
+    client = AsyncSMTPClient(host="localhost", port=25, authenticator=authenticator)
+    await client.send_message(message)
 
 
 # If your SMTP server requires basic authentication, this is where you enter that

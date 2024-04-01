@@ -5,6 +5,13 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
+- **BACKWARDS INCOMPATIBLE** The concrete client implementations were refactored:
+
+  * ``AsyncSMTPClient`` and ``SyncSMTPClient`` were refactored into "session factories",
+    and thus are no longer used as context managers
+  * The ``send_message()`` method is now reentrant, as it now creates (and closes) an
+    ad-hoc session with the SMTP server
+  * The ``connect()`` method now returns a context manager that yields an SMTP session
 - **BACKWARDS INCOMPATIBLE** The ``OAuth2Authenticator`` class was refactored:
 
   * The return type of ``get_token()`` was changed to a (decoded) JSON web token –

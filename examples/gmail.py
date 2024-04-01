@@ -42,10 +42,8 @@ class GMailAuthenticator(OAuth2Authenticator):
 
 
 async def main() -> None:
-    async with AsyncSMTPClient(
-        host="smtp.gmail.com", authenticator=authenticator
-    ) as client:
-        await client.send_message(message)
+    client = AsyncSMTPClient(host="smtp.gmail.com", authenticator=authenticator)
+    await client.send_message(message)
 
 
 authenticator = GMailAuthenticator(
