@@ -250,7 +250,7 @@ class AsyncSMTPClient:
         self.port = port
         self.connect_timeout = connect_timeout
         self.timeout = timeout
-        self.domain = domain or socket.gethostname()
+        self.domain: str = domain or socket.gethostname()
         self.ssl_context = ssl_context
         self.authenticator = authenticator
         self._semaphore = Semaphore(max_concurrent_connections)

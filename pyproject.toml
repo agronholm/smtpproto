@@ -89,14 +89,19 @@ minversion = 4.0
 
 [testenv]
 depends = lint
+package = editable
 commands = pytest {posargs}
 extras = test
 
-[testenv:lint]
+[testenv:pre-commit]
 depends =
+package = skip
 deps = pre-commit
 commands = pre-commit run --all-files --show-diff-on-failure
-skip_install = true
+
+[testenv:pyright]
+deps = pyright
+commands = pyright --verifytypes smtpproto
 
 [testenv:docs]
 extras = doc
