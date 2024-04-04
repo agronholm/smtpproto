@@ -4,7 +4,7 @@ import logging
 import socket
 import sys
 from collections.abc import AsyncGenerator, Callable, Generator, Iterable
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
@@ -20,13 +20,14 @@ from anyio import (
     aclose_forcefully,
     connect_tcp,
     fail_after,
+    move_on_after,
 )
 from anyio.abc import BlockingPortal, SocketStream
 from anyio.streams.tls import TLSStream
 
-from ._utils import BlockingPortalProvider, wrap_async_context_manager
+from ._utils import BlockingPortalProvider
 from .auth import SMTPAuthenticator
-from .protocol import ClientState, SMTPClientProtocol, SMTPException, SMTPResponse
+from .protocol import ClientState, SMTPClientProtocol, SMTPResponse
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -56,6 +57,7 @@ class AsyncSMTPSession:
     ssl_context: SSLContext | None
     protocol: SMTPClientProtocol = field(init=False, default_factory=SMTPClientProtocol)
     _stream: TLSStream | SocketStream = field(init=False)
+    _exit_stack: AsyncExitStack = field(init=False)
 
     async def send_message(
         self,
@@ -108,9 +110,6 @@ class AsyncSMTPSession:
         :param kwargs: keyword arguments to ``command``
 
         """
-        if not self._stream:
-            raise SMTPException("Not connected")
-
         command(*args, **kwargs)
         await self._flush_output()
         return await self._wait_response()
@@ -148,11 +147,20 @@ class AsyncSMTPSession:
                 del self._stream
                 raise
 
+    async def aclose(self) -> None:
+        if hasattr(self, "_stream"):
+            stream = self._stream
+            del self._stream
+            with move_on_after(5, shield=True):
+                await stream.aclose()
+
     async def __aenter__(self) -> AsyncSMTPSession:
         with fail_after(self.connect_timeout):
             self._stream = await connect_tcp(self.host, self.port)
 
-        try:
+        async with AsyncExitStack() as exit_stack:
+            exit_stack.push_async_callback(self.aclose)
+
             await self._wait_response()
             await self.send_command(self.protocol.send_greeting, self.domain)
 
@@ -187,10 +195,8 @@ class AsyncSMTPSession:
                     pass
                 finally:
                     await auth_gen.aclose()
-        except BaseException:
-            await aclose_forcefully(self._stream)
-            del self._stream
-            raise
+
+            self._exit_stack = exit_stack.pop_all()
 
         return self
 
@@ -204,9 +210,7 @@ class AsyncSMTPSession:
             if self.protocol.state is not ClientState.finished:
                 await self.send_command(self.protocol.quit)
         finally:
-            stream = self._stream
-            del self._stream
-            await stream.aclose()
+            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
 
     def __del__(self) -> None:
         if hasattr(self, "_stream"):
@@ -412,7 +416,7 @@ class SyncSMTPClient:
         """
         with self._portal_provider as portal:
             async_session_cm = portal.call(self._async_client.connect)
-            with wrap_async_context_manager(async_session_cm, portal) as async_session:
+            with portal.wrap_async_context_manager(async_session_cm) as async_session:
                 yield SyncSMTPSession(portal, async_session)
 
     def send_message(

@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-from contextlib import (
-    AbstractAsyncContextManager,
-    AbstractContextManager,
-    contextmanager,
-)
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from threading import Lock
 from types import TracebackType
@@ -57,16 +52,3 @@ class BlockingPortalProvider:
 
         if portal_cm:
             portal_cm.__exit__(None, None, None)
-
-
-@contextmanager
-def wrap_async_context_manager(
-    async_cm: AbstractAsyncContextManager[T], portal: BlockingPortal
-) -> Generator[T, Any, bool | None]:
-    retval = portal.call(async_cm.__aenter__)
-    try:
-        yield retval
-    except BaseException as exc:
-        return portal.call(async_cm.__aexit__, type(exc), exc, exc.__traceback__)
-    else:
-        return portal.call(async_cm.__aexit__, None, None, None)
