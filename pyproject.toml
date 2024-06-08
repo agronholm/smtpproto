@@ -88,7 +88,7 @@ skip_missing_interpreters = true
 minversion = 4.0
 
 [testenv]
-depends = lint
+depends = pre-commit
 package = editable
 commands = pytest {posargs}
 extras = test
