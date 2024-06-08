@@ -67,7 +67,7 @@ def start_server(
         port=port,
         ssl_context=ssl_context,
     )
-    controller.start()  # type: ignore[no-untyped-call]
+    controller.start()
     yield controller.hostname, port
     controller.stop()
 
