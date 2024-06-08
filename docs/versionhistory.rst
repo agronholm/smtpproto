@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Upgraded minimum AnyIO version to 4.4.0
+
 **2.0.0**
 
 - **BACKWARDS INCOMPATIBLE** The concrete client implementations were refactored:

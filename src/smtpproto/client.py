@@ -23,9 +23,9 @@ from anyio import (
     move_on_after,
 )
 from anyio.abc import BlockingPortal, SocketStream
+from anyio.from_thread import BlockingPortalProvider
 from anyio.streams.tls import TLSStream
 
-from ._utils import BlockingPortalProvider
 from .auth import SMTPAuthenticator
 from .protocol import ClientState, SMTPClientProtocol, SMTPResponse
 
