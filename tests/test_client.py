@@ -75,13 +75,13 @@ def start_server(
 @pytest.fixture
 def message() -> EmailMessage:
     message = EmailMessage()
-    message["From"] = Address("Foo Bar", "foo.bar", "baz.com")  # type: ignore[assignment]
-    message["To"] = ["test1@example.org"]  # type: ignore[assignment]
-    message["Cc"] = ["test2@example.org"]  # type: ignore[assignment]
-    message["Bcc"] = ["test3@example.org"]  # type: ignore[assignment]
-    message["Resent-To"] = ["test4@example.org"]  # type: ignore[assignment]
-    message["Resent-Cc"] = ["test5@example.org"]  # type: ignore[assignment]
-    message["Resent-Bcc"] = ["test6@example.org"]  # type: ignore[assignment]
+    message["From"] = Address("Foo Bar", "foo.bar", "baz.com")
+    message["To"] = ["test1@example.org"]
+    message["Cc"] = ["test2@example.org"]
+    message["Bcc"] = ["test3@example.org"]
+    message["Resent-To"] = ["test4@example.org"]
+    message["Resent-Cc"] = ["test5@example.org"]
+    message["Resent-Bcc"] = ["test6@example.org"]
     message["Subject"] = "Unicöde string"
     return message
 
@@ -228,9 +228,9 @@ class TestSyncClient:
         use_tls: bool,
     ) -> None:
         message = EmailMessage()
-        message["From"] = Address("Foo Bar", "foo.bar", "baz.com")  # type: ignore[assignment]
-        message["To"] = ["test@example.org"]  # type: ignore[assignment]
-        message["Cc"] = ["test2@example.org"]  # type: ignore[assignment]
+        message["From"] = Address("Foo Bar", "foo.bar", "baz.com")
+        message["To"] = ["test@example.org"]
+        message["Cc"] = ["test2@example.org"]
         message["Subject"] = "Unicöde string"
         with start_server(ssl_context=server_context if use_tls else None) as (
             host,
