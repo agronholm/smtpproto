@@ -5,6 +5,7 @@ from typing import cast
 import anyio
 import httpx
 import jwt
+
 from smtpproto.auth import JSONWebToken, OAuth2Authenticator
 from smtpproto.client import AsyncSMTPClient
 

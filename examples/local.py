@@ -1,6 +1,7 @@
 from email.message import EmailMessage
 
 import anyio
+
 from smtpproto.auth import PlainAuthenticator
 from smtpproto.client import AsyncSMTPClient
 
