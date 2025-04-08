@@ -11,7 +11,7 @@ from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from warnings import warn
 
 from anyio import (
@@ -76,7 +76,10 @@ class AsyncSMTPSession:
         :return: the SMTP response
 
         """
-        sender = sender or parseaddr(message.get("From"))[1]
+        # type checkers don't handle default typevar values yet, so they see
+        # message.get() returning Any | None thought it should be str
+        from_ = cast(str, message.get("From"))
+        sender = sender or parseaddr(from_)[1]
         await self.send_command(self.protocol.mail, sender)
 
         if not recipients:

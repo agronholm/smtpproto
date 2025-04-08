@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 from _pytest.fixtures import SubRequest
+
 from smtpproto.protocol import (
     ClientState,
     SMTPClientProtocol,

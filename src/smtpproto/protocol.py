@@ -6,7 +6,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from email.headerregistry import Address
 from email.message import EmailMessage
-from email.policy import SMTP, SMTPUTF8, Policy
+from email.policy import SMTP, SMTPUTF8
 from enum import Enum, auto
 from re import Pattern
 from typing import NoReturn
@@ -385,7 +385,7 @@ class SMTPClientProtocol:
 
         """
         self._require_state(ClientState.send_data)
-        policy: Policy = SMTPUTF8 if self._smtputf8_message else SMTP
+        policy = SMTPUTF8 if self._smtputf8_message else SMTP
         policy = (
             policy.clone(cte_type="7bit")
             if "8BITMIME" not in self._extensions
